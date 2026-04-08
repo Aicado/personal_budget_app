@@ -1,0 +1,100 @@
+.category-breakdown {
+  margin: 2rem 0;
+}
+
+.category-breakdown h2 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #9b59b6;
+  padding-bottom: 0.5rem;
+}
+
+.categories-list {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #ecf0f1;
+}
+
+.category-item {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.category-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.category-name {
+  font-weight: 600;
+  color: #2c3e50;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-amount {
+  font-weight: 700;
+  color: #9b59b6;
+  font-size: 1.05rem;
+}
+
+.category-bar-container {
+  background-color: #ecf0f1;
+  border-radius: 4px;
+  height: 20px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.category-bar {
+  background: linear-gradient(90deg, #9b59b6, #8e44ad);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.category-percentage {
+  font-size: 0.85rem;
+  color: #95a5a6;
+  text-align: right;
+}
+
+.category-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #ecf0f1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.total-spending {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.total-amount {
+  color: #27ae60;
+  font-size: 1.3rem;
+}
+
+.category-count {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}

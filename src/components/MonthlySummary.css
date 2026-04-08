@@ -1,0 +1,99 @@
+.monthly-summary {
+  margin: 2rem 0;
+}
+
+.monthly-summary h2 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5rem;
+}
+
+.summary-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.month-card {
+  background: white;
+  border: 1px solid #ecf0f1;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.month-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #3498db;
+}
+
+.month-label {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.flows-visualization {
+  margin: 1rem 0;
+}
+
+.flow-item {
+  margin-bottom: 1rem;
+}
+
+.flow-label {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.flow-bar-container {
+  background-color: #ecf0f1;
+  border-radius: 4px;
+  height: 24px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.flow-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.income-bar {
+  background-color: #2ecc71;
+}
+
+.expense-bar {
+  background-color: #e74c3c;
+}
+
+.flow-amount {
+  font-size: 0.95rem;
+  color: #34495e;
+  font-weight: 600;
+}
+
+.net-amount {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
+.net-amount.positive {
+  background-color: #d5f4e6;
+  color: #27ae60;
+}
+
+.net-amount.negative {
+  background-color: #fadbd8;
+  color: #c0392b;
+}
