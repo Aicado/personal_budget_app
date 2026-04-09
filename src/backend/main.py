@@ -14,6 +14,18 @@ app = FastAPI(title="YNAB Analyzer API", version="0.1.0")
 # Initialize database
 db = TransactionDatabase()
 
+@app.on_event("startup")
+def load_data_on_startup():
+    """Automatically load data from the data directory when the app starts."""
+    project_root = Path(__file__).parent.parent.parent
+    accounts_dir = project_root / "data"
+    transactions_dir = project_root / "data" / "ynab_data"
+    if accounts_dir.exists() or transactions_dir.exists():
+        try:
+            backfill_database(str(accounts_dir), str(transactions_dir))
+        except Exception as e:
+            print(f"Warning: failed to load data on startup: {e}")
+
 # Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
@@ -149,133 +161,93 @@ def get_database_stats():
 
 @app.get("/database/files")
 def get_uploaded_files():
-    """Get information about all uploaded files."""
+    """Get account summary data from the database."""
     try:
-        return {"files": db.get_files_info()}
+        return {"files": db.get_account_summaries()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/backfill")
-def backfill_ynab_data():
-    """Backfill the database with all YNAB CSV files in the data directory."""
+@app.get("/accounts/status")
+def get_account_status():
+    """Get account load status for transactions and current balances."""
     try:
-        # Get the project root directory
-        project_root = Path(__file__).parent.parent.parent
-        data_dir = project_root / "data"
+        return {"accounts": db.get_account_load_status()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/accounts/{account_name}/transactions")
+def get_account_transactions(account_name: str, limit: int = 50):
+    """Get recent transactions for a specific account."""
+    try:
+        # URL decode the account name
+        import urllib.parse
+        account_name = urllib.parse.unquote(account_name)
         
-        if not data_dir.exists():
-            raise HTTPException(status_code=400, detail="data directory not found")
+        rows = db.conn.execute("""
+            SELECT date, payee, category, outflow, inflow, amount, description
+            FROM transactions 
+            WHERE account = ?
+            ORDER BY date DESC
+            LIMIT ?
+        """, [account_name, limit]).fetchall()
         
-        # Run backfill
-        result = backfill_database(str(data_dir))
-        return result
+        transactions = [
+            {
+                "date": str(row[0]),
+                "payee": row[1] or "",
+                "category": row[2] or "",
+                "outflow": float(row[3] or 0),
+                "inflow": float(row[4] or 0),
+                "amount": float(row[5] or 0),
+                "description": row[6] or ""
+            }
+            for row in rows
+        ]
         
+        return {"account": account_name, "transactions": transactions}
     except Exception as e:
         import traceback
         error_msg = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"Error during backfill: {error_msg}")
+        print(f"Error fetching account transactions: {error_msg}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/net-worth/current-balances")
 def get_current_balances():
-    """Get current account balances from current.csv files in account subdirectories.
-    
-    Debit = asset value (what you own)
-    Credit = liability value (what you owe)
-    Net Value = Debit - Credit
-    """
+    """Get current account balances from the database."""
     try:
-        # Get the project root directory
-        project_root = Path(__file__).parent.parent.parent
-        data_dir = project_root / "data"
-        
-        if not data_dir.exists():
-            raise HTTPException(status_code=404, detail="data directory not found")
-        
-        # Find all current.csv files in account subdirectories
-        accounts = []
-        total_assets = 0
-        total_debt = 0
-        
-        # Scan all subdirectories for current.csv files
-        for current_csv_path in data_dir.rglob("current.csv"):
-            try:
-                # Extract account type and name from path
-                # Path structure: data/[account_type]/[account_name]/current.csv
-                parts = current_csv_path.relative_to(data_dir).parts
-                
-                if len(parts) >= 3 and parts[-1] == "current.csv":
-                    account_type = parts[0]
-                    account_name = parts[1]
-                    
-                    # Read the current.csv file
-                    df = pd.read_csv(current_csv_path)
-                    
-                    if len(df) > 0:
-                        # Get the most recent balance (last row)
-                        latest_row = df.iloc[-1]
-                        
-                        # Extract debit and credit values
-                        debit = 0.0
-                        credit = 0.0
-                        
-                        if 'debit' in df.columns:
-                            try:
-                                debit = float(latest_row['debit'])
-                            except (ValueError, TypeError):
-                                debit = 0.0
-                        
-                        if 'credit' in df.columns:
-                            try:
-                                credit = float(latest_row['credit'])
-                            except (ValueError, TypeError):
-                                credit = 0.0
-                        
-                        # Calculate net value: debit (asset) - credit (liability)
-                        net_value = debit - credit
-                        
-                        # Classify as asset or debt
-                        is_asset = 'credit' not in account_type.lower() and 'debt' not in account_type.lower()
-                        
-                        accounts.append({
-                            "name": account_name.replace('_', ' ').title(),
-                            "balance": net_value,
-                            "debit": debit,
-                            "credit": credit,
-                            "type": account_type.replace('_', ' ').title(),
-                            "is_asset": is_asset
-                        })
-                        
-                        # Add to appropriate total
-                        if is_asset:
-                            total_assets += net_value
-                        else:
-                            # For debt accounts, the net_value represents net liability
-                            # If positive (rewards > owed), it reduces debt
-                            # If negative (owed > rewards), it increases debt
-                            total_debt += abs(net_value) if net_value < 0 else -net_value
-            except Exception as e:
-                print(f"Warning: Error processing {current_csv_path}: {e}")
-                continue
-        
-        if not accounts:
-            return {
-                "accounts": [],
-                "total_assets": 0,
-                "total_debt": 0,
-                "net_worth": 0,
-                "message": "No account balance data found"
-            }
-        
+        accounts = db.get_account_balances()
+        total_assets = 0.0
+        total_debt = 0.0
+        results = []
+
+        for account in accounts:
+            account_type = account.get("type", "Unknown") or "Unknown"
+            is_asset = "credit" not in account_type.lower() and "debt" not in account_type.lower()
+            net_value = account.get("net_value", 0.0)
+
+            results.append({
+                "name": account.get("name", "Unknown"),
+                "type": account_type,
+                "debit": account.get("debit", 0.0),
+                "credit": account.get("credit", 0.0),
+                "net_value": net_value,
+                "is_asset": is_asset
+            })
+
+            if is_asset:
+                total_assets += net_value
+            else:
+                total_debt += abs(net_value)
+
         return {
-            "accounts": accounts,
+            "accounts": results,
             "total_assets": total_assets,
             "total_debt": total_debt,
             "net_worth": total_assets - total_debt
         }
-        
     except Exception as e:
         import traceback
         error_msg = f"{str(e)}\n{traceback.format_exc()}"

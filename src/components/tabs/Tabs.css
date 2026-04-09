@@ -322,28 +322,78 @@
   border-bottom: 2px solid #ecf0f1;
   padding-bottom: 1rem;
   margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
 .account-header h3 {
   margin: 0;
   color: #2c3e50;
+  flex: 1;
 }
 
-.account-details {
+.account-header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
+.expand-btn {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.account-transactions {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #ecf0f1;
+}
+
+.account-transactions h4 {
+  margin: 0 0 1rem 0;
+  color: #34495e;
+  font-size: 1.1rem;
+}
+
+.transactions-table-container {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ecf0f1;
+  border-radius: 8px;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.transactions-table th,
+.transactions-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ecf0f1;
+  color: #2c3e50;
+}
+
+.transactions-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #34495e;
+  position: sticky;
+  top: 0;
+}
+
+.transactions-table tr:hover {
+  background: #f8f9fa;
+}
+
+/* Improve text contrast */
 .detail-item .label {
   color: #7f8c8d;
-  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -353,11 +403,169 @@
 }
 
 .value-positive {
-  color: #27ae60;
+  color: #27ae60 !important;
 }
 
 .value-negative {
-  color: #e74c3c;
+  color: #e74c3c !important;
+}
+
+/* Net Worth table improvements */
+.net-worth-table table th,
+.net-worth-table table td {
+  color: #2c3e50;
+  padding: 0.75rem;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.net-worth-table table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #34495e;
+}
+
+/* Ensure good contrast in all contexts */
+.app-main,
+.tab-header,
+.account-card,
+.net-worth-tab,
+.income-expense-tab,
+.spending-trends-tab {
+  color: #2c3e50;
+}
+
+.accounts-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.accounts-filter {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-secondary.active-filter {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.accounts-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-item {
+  background: #f8f9fa;
+  border: 1px solid #ecf0f1;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.summary-item strong {
+  color: #2c3e50;
+  font-size: 1.15rem;
+}
+
+.needs-data-section {
+  background: #fafbfc;
+  border: 1px solid #e6ecf1;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.needs-data-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.needs-data-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.needs-data-header p {
+  margin: 0;
+  color: #65758a;
+  font-size: 0.95rem;
+}
+
+.needs-data-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.needs-data-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: white;
+  border: 1px solid #e6ecf1;
+  border-radius: 10px;
+}
+
+.needs-data-tag {
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.needs-transactions {
+  background: rgba(231, 76, 60, 0.12);
+  color: #c0392b;
+}
+
+.needs-balance {
+  background: rgba(241, 196, 15, 0.15);
+  color: #b7950b;
+}
+
+.all-loaded-message {
+  padding: 1rem;
+  background: #eef9f3;
+  border: 1px solid #d4efdf;
+  border-radius: 10px;
+  color: #27ae60;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-warning {
+  background: rgba(231, 76, 60, 0.12);
+  color: #c0392b;
+}
+
+.status-success {
+  background: rgba(46, 204, 113, 0.12);
+  color: #27ae60;
 }
 
 /* Income/Expense Tab */

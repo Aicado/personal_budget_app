@@ -33,7 +33,18 @@ export const NetWorthTab: React.FC = () => {
         throw new Error('Failed to fetch current account balances')
       }
       const data = await response.json()
-      setBalanceData(data)
+      const normalizedAccounts = (data.accounts || []).map((account: any) => ({
+        name: account.name || 'Unknown',
+        type: account.type || 'Unknown',
+        is_asset: account.is_asset ?? (account.type ? account.type.toLowerCase().indexOf('credit') === -1 && account.type.toLowerCase().indexOf('debt') === -1 : true),
+        balance: typeof account.net_value === 'number' ? account.net_value : typeof account.balance === 'number' ? account.balance : 0,
+      }))
+      setBalanceData({
+        accounts: normalizedAccounts,
+        total_assets: data.total_assets || 0,
+        total_debt: data.total_debt || 0,
+        net_worth: data.net_worth || 0,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {

@@ -28,14 +28,13 @@ export const SpendingTrendsTab: React.FC = () => {
       }
       const data = await response.json()
       
-      // For now, return sample data structure
-      // In a real scenario, the backend would calculate this
-      setTrendsData({
-        months: ['Nov 2023', 'Dec 2023', 'Jan 2024', 'Feb 2024', 'Mar 2024', 'Apr 2024'],
-        net_amounts: [5000, 4500, 6000, 5500, 7000, 6500],
-        outflows: [2000, 2500, 3000, 2800, 3200, 3000],
-        inflows: [7000, 7000, 9000, 8300, 10200, 9500],
-      })
+      const trends = data.monthly_trends || {
+        months: [],
+        net_amounts: [],
+        outflows: [],
+        inflows: []
+      }
+      setTrendsData(trends)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -121,7 +120,7 @@ export const SpendingTrendsTab: React.FC = () => {
         </>
       ) : (
         <div className="no-data">
-          <p>No spending trends data available. Try uploading a CSV file first.</p>
+          <p>No spending trends data available. Make sure the backend has loaded the data directory.</p>
         </div>
       )}
     </div>

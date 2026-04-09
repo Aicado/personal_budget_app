@@ -8,17 +8,17 @@ from .transaction_analyzer import TransactionAnalyzer
 from .database import TransactionDatabase
 
 
-def find_csv_files(directory: str) -> List[Path]:
-    """Find all CSV files in directory recursively, excluding summary files."""
+def find_transaction_files(directory: str) -> List[Path]:
+    """Find all transaction CSV files in the directory recursively."""
     csv_files = []
     base_path = Path(directory)
     
-    # Pattern to exclude summary files
     exclude_patterns = ["income-expense", "net-worth", "breakdown.csv"]
     
     for csv_file in base_path.rglob("*.csv"):
-        # Check if file should be excluded
         filename = csv_file.name.lower()
+        if filename == "current.csv":
+            continue
         if any(pattern.lower() in filename for pattern in exclude_patterns):
             continue
         csv_files.append(csv_file)
@@ -26,62 +26,137 @@ def find_csv_files(directory: str) -> List[Path]:
     return sorted(csv_files)
 
 
-def backfill_database(data_dir: str = "data") -> Dict[str, Any]:
-    """Backfill DuckDB with all YNAB CSV files.
-    
-    Args:
-        data_dir: Directory containing YNAB CSV files
-        
-    Returns:
-        Dictionary with backfill report
-    """
-    # Initialize database
+def find_current_balance_files(directory: str) -> List[Path]:
+    """Find all current.csv files in account subdirectories."""
+    return sorted(Path(directory).rglob("current.csv"))
+
+
+def get_account_metadata(csv_path: Path, base_dir: Path) -> Dict[str, str]:
+    """Extract account metadata from a CSV file path."""
+    relative = csv_path.relative_to(base_dir)
+    parts = relative.parts
+    metadata = {
+        "account_name": None,
+        "account_type": None,
+        "account_path": None,
+    }
+
+    if len(parts) >= 3 and parts[0].lower() != "ynab_data":
+        metadata["account_type"] = parts[0]
+        metadata["account_name"] = parts[1]
+        metadata["account_path"] = "/".join(parts[:-1])
+    elif len(parts) >= 2 and parts[0].lower() != "ynab_data":
+        metadata["account_type"] = parts[0]
+        metadata["account_name"] = parts[1]
+        metadata["account_path"] = "/".join(parts[:-1])
+
+    return metadata
+
+
+def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_data") -> Dict[str, Any]:
+    """Backfill DuckDB with account definitions from accounts_dir and transactions from transactions_dir."""
     db = TransactionDatabase()
+    db.clear_tables()
     
-    # Find all CSV files
-    csv_files = find_csv_files(data_dir)
+    # Load account definitions from accounts_dir
+    accounts_path = Path(accounts_dir)
+    balance_files = find_current_balance_files(accounts_dir)
     
-    if not csv_files:
+    # Load transactions from transactions_dir
+    transactions_path = Path(transactions_dir)
+    transaction_files = find_transaction_files(transactions_dir)
+    
+    if not transaction_files and not balance_files:
         return {
             "status": "error",
-            "message": "No CSV files found in data directory",
-            "files_processed": 0
+            "message": "No CSV files found in accounts or transactions directories",
+            "files_processed": 0,
+            "accounts_loaded": 0
         }
     
-    # Track results
     results = {
         "status": "success",
-        "message": f"Backfill completed",
-        "total_files_found": len(csv_files),
+        "message": "Data load completed",
+        "total_files_found": len(transaction_files),
         "files_processed": 0,
         "files_skipped": 0,
         "total_transactions_added": 0,
+        "accounts_loaded": 0,
         "file_reports": []
     }
-    
-    # Try to load current account balances if available
-    current_csv = Path(data_dir) / "current.csv"
-    current_balances = {}
-    if current_csv.exists():
+
+    # Load current account balances from account-specific current.csv files in accounts_dir
+    account_map = {}  # account_name -> metadata
+    for balance_file in balance_files:
         try:
-            balance_df = pd.read_csv(current_csv)
-            for _, row in balance_df.iterrows():
-                account_name = row.get('account') or row.get('Account')
-                balance = row.get('balance') or row.get('Balance') or row.get('current_balance') or row.get('Current Balance')
-                if account_name and balance:
-                    current_balances[str(account_name).strip()] = float(balance)
+            metadata = get_account_metadata(balance_file, accounts_path)
+            if not metadata["account_name"] or not metadata["account_type"]:
+                continue
+
+            df = pd.read_csv(balance_file)
+            if df.empty:
+                continue
+
+            latest = df.iloc[-1]
+            debit = float(latest.get("debit", 0) or 0)
+            credit = float(latest.get("credit", 0) or 0)
+            net_value = debit - credit
+
+            account_name = metadata["account_name"].replace('_', ' ').title()
+            account_map[account_name] = metadata
+
+            db.register_account(
+                account_name=account_name,
+                account_type=metadata["account_type"].replace('_', ' ').title(),
+                account_path=metadata["account_path"],
+                current_debit=debit,
+                current_credit=credit,
+                net_value=net_value,
+            )
+            results["accounts_loaded"] += 1
         except Exception as e:
-            print(f"Warning: Could not load current balances: {e}")
-    
-    # Process each CSV file
-    for csv_file in csv_files:
+            results["file_reports"].append({
+                "filename": balance_file.name,
+                "status": "account-error",
+                "error": str(e),
+                "path": str(balance_file)
+            })
+
+    # Process transaction files from transactions_dir
+    for csv_file in transaction_files:
         try:
-            # Read and parse CSV
             analyzer = TransactionAnalyzer()
             df = analyzer.load_file(str(csv_file))
             analyzer.parse_transactions(df)
+
+            # For each transaction, assign to account based on Account column
+            if "account" not in analyzer.df.columns:
+                results["file_reports"].append({
+                    "filename": csv_file.name,
+                    "status": "skipped",
+                    "reason": "No 'account' column found",
+                    "transactions_count": len(analyzer.df),
+                    "path": str(csv_file)
+                })
+                continue
+
+            # Filter transactions to only those with accounts in our account_map
+            valid_accounts = set(account_map.keys())
+            df_filtered = analyzer.df[analyzer.df["account"].isin(valid_accounts)].copy()
             
-            # Check if file already exists
+            if df_filtered.empty:
+                results["file_reports"].append({
+                    "filename": csv_file.name,
+                    "status": "skipped",
+                    "reason": "No transactions match defined accounts",
+                    "transactions_count": len(analyzer.df),
+                    "path": str(csv_file)
+                })
+                continue
+
+            # Update analyzer.df to filtered version
+            analyzer.df = df_filtered
+
             if db.file_exists(analyzer.df):
                 results["files_skipped"] += 1
                 results["file_reports"].append({
@@ -92,10 +167,21 @@ def backfill_database(data_dir: str = "data") -> Dict[str, Any]:
                     "path": str(csv_file)
                 })
                 continue
-            
-            # Insert into database
-            db_result = db.insert_transactions(analyzer.df, csv_file.name)
-            
+
+            # For each account in the filtered data, insert with metadata
+            accounts_in_file = df_filtered["account"].unique()
+            for account_name in accounts_in_file:
+                account_df = df_filtered[df_filtered["account"] == account_name].copy()
+                metadata = account_map.get(account_name)
+                if metadata:
+                    db_result = db.insert_transactions(
+                        account_df,
+                        csv_file.name,
+                        account_name=account_name,
+                        account_type=metadata["account_type"],
+                        account_path=metadata["account_path"]
+                    )
+
             results["files_processed"] += 1
             results["total_transactions_added"] += len(analyzer.df)
             results["file_reports"].append({
@@ -108,9 +194,7 @@ def backfill_database(data_dir: str = "data") -> Dict[str, Any]:
                 },
                 "unique_categories": analyzer.df["category"].nunique(),
                 "path": str(csv_file),
-                "db_result": db_result
             })
-            
         except Exception as e:
             results["file_reports"].append({
                 "filename": csv_file.name,
@@ -118,11 +202,8 @@ def backfill_database(data_dir: str = "data") -> Dict[str, Any]:
                 "error": str(e),
                 "path": str(csv_file)
             })
-    
-    # Get final database stats
-    db_stats = db.get_database_stats()
-    results["database_summary"] = db_stats
-    
+
+    results["database_summary"] = db.get_database_stats()
     db.close()
     return results
 

@@ -88,13 +88,22 @@ class TransactionAnalyzer:
         # YNAB format has "Category Group/Category" or just "Category"
         if "category group/category" in df.columns:
             df["category"] = df["category group/category"].fillna("Uncategorized")
-            # Extract just the final category part after the last slash
+            df["category_group"] = df["category"].str.split("|").str[0].str.strip()
             df["category"] = df["category"].str.split("|").str[-1].str.strip()
         elif "category" in df.columns:
             df["category"] = df["category"].fillna("Uncategorized")
+            df["category_group"] = df["category"].str.split("|").str[0].str.strip()
             df["category"] = df["category"].str.split("|").str[-1].str.strip()
         else:
             df["category"] = "Uncategorized"
+            df["category_group"] = "Uncategorized"
+
+        # Determine transaction type for income/expense tracking
+        df["transaction_type"] = np.where(
+            df["inflow"] > df["outflow"],
+            "income",
+            np.where(df["outflow"] > df["inflow"], "expense", "transfer")
+        )
 
         # Extract month-year for grouping
         df["month"] = df["date"].dt.to_period("M")

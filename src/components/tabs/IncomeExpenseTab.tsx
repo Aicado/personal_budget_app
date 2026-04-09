@@ -59,6 +59,10 @@ export const IncomeExpenseTab: React.FC = () => {
 
       {loading ? (
         <div className="loading">Loading report...</div>
+      ) : Object.keys(categoryData).length === 0 ? (
+        <div className="no-data">
+          <p>No category data found. Make sure the backend has loaded your transaction data.</p>
+        </div>
       ) : (
         <>
           <div className="summary-cards">
