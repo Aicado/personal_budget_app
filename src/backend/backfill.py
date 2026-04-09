@@ -103,11 +103,14 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_
             net_value = debit - credit
 
             account_name = metadata["account_name"].replace('_', ' ').title()
+            account_type_formatted = metadata["account_type"].replace('_', ' ').title()
+            # Store formatted account_type in metadata for consistent use in transactions
+            metadata["account_type"] = account_type_formatted
             account_map[account_name] = metadata
 
             db.register_account(
                 account_name=account_name,
-                account_type=metadata["account_type"].replace('_', ' ').title(),
+                account_type=account_type_formatted,
                 account_path=metadata["account_path"],
                 current_debit=debit,
                 current_credit=credit,

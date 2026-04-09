@@ -9,7 +9,7 @@ from .transaction_analyzer import TransactionAnalyzer
 from .database import TransactionDatabase
 from .backfill import backfill_database
 
-app = FastAPI(title="YNAB Analyzer API", version="0.1.0")
+app = FastAPI(title="Personal Budget App API", version="0.1.0")
 
 # Initialize database
 db = TransactionDatabase()

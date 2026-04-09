@@ -1,6 +1,6 @@
-# YNAB Transaction Analyzer
+# Personal Budget App
 
-A full-stack application to analyze YNAB (You Need A Budget) transaction data and visualize monthly spending trends, similar to YNAB's built-in reports.
+A full-stack application to analyze personal budget data and visualize monthly spending trends, similar to YNAB's built-in reports.
 
 ## 🎯 Features
 

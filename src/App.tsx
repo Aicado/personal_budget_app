@@ -21,7 +21,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>📊 YNAB Transaction Analyzer</h1>
+          <h1>📊 Personal Budget App</h1>
           <p className="subtitle">Automatically load account and transaction data from the backend data store</p>
         </div>
       </header>
