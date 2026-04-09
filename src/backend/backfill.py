@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-import pandas as pd
+import polars as pl
 from typing import List, Dict, Any
 from .transaction_analyzer import TransactionAnalyzer
 from .database import TransactionDatabase
@@ -93,11 +93,11 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_
             if not metadata["account_name"] or not metadata["account_type"]:
                 continue
 
-            df = pd.read_csv(balance_file)
-            if df.empty:
+            df = pl.read_csv(balance_file)
+            if df.is_empty():
                 continue
 
-            latest = df.iloc[-1]
+            latest = df.tail(1).to_dicts()[0]
             debit = float(latest.get("debit", 0) or 0)
             credit = float(latest.get("credit", 0) or 0)
             net_value = debit - credit
@@ -138,21 +138,21 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_
                     "filename": csv_file.name,
                     "status": "skipped",
                     "reason": "No 'account' column found",
-                    "transactions_count": len(analyzer.df),
+                    "transactions_count": analyzer.df.height,
                     "path": str(csv_file)
                 })
                 continue
 
             # Filter transactions to only those with accounts in our account_map
             valid_accounts = set(account_map.keys())
-            df_filtered = analyzer.df[analyzer.df["account"].isin(valid_accounts)].copy()
+            df_filtered = analyzer.df.filter(pl.col("account").is_in(valid_accounts))
             
-            if df_filtered.empty:
+            if df_filtered.is_empty():
                 results["file_reports"].append({
                     "filename": csv_file.name,
                     "status": "skipped",
                     "reason": "No transactions match defined accounts",
-                    "transactions_count": len(analyzer.df),
+                    "transactions_count": analyzer.df.height,
                     "path": str(csv_file)
                 })
                 continue
@@ -166,15 +166,15 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_
                     "filename": csv_file.name,
                     "status": "skipped",
                     "reason": "Data already exists in database",
-                    "transactions_count": len(analyzer.df),
+                    "transactions_count": analyzer.df.height,
                     "path": str(csv_file)
                 })
                 continue
 
             # For each account in the filtered data, insert with metadata
-            accounts_in_file = df_filtered["account"].unique()
+            accounts_in_file = df_filtered["account"].unique().to_list()
             for account_name in accounts_in_file:
-                account_df = df_filtered[df_filtered["account"] == account_name].copy()
+                account_df = df_filtered.filter(pl.col("account") == account_name)
                 metadata = account_map.get(account_name)
                 if metadata:
                     db_result = db.insert_transactions(
@@ -186,16 +186,16 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_
                     )
 
             results["files_processed"] += 1
-            results["total_transactions_added"] += len(analyzer.df)
+            results["total_transactions_added"] += analyzer.df.height
             results["file_reports"].append({
                 "filename": csv_file.name,
                 "status": "inserted",
-                "transactions_count": len(analyzer.df),
+                "transactions_count": analyzer.df.height,
                 "date_range": {
-                    "start": str(analyzer.df["date"].min().date()),
-                    "end": str(analyzer.df["date"].max().date())
+                    "start": str(analyzer.df["date"].min()),
+                    "end": str(analyzer.df["date"].max())
                 },
-                "unique_categories": analyzer.df["category"].nunique(),
+                "unique_categories": int(analyzer.df["category"].n_unique()),
                 "path": str(csv_file),
             })
         except Exception as e:

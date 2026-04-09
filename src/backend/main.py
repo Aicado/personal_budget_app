@@ -1,8 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import pandas as pd
-import io
+import polars as pl
 from pathlib import Path
 
 from .transaction_analyzer import TransactionAnalyzer
@@ -128,7 +127,7 @@ async def analyze_multiple_files(files: list[UploadFile] = File(...)):
                 })
         
         # Combine all dataframes
-        combined_df = pd.concat(all_dfs, ignore_index=True)
+        combined_df = pl.concat(all_dfs, rechunk=True)
         
         # Analyze combined data
         analyzer = TransactionAnalyzer()

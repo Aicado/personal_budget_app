@@ -1,37 +1,48 @@
-import pandas as pd
-import numpy as np
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Tuple, Any
 import io
+from typing import Any, Dict
+
+import polars as pl
 
 
 class TransactionAnalyzer:
     """Analyzes YNAB transaction data and generates monthly trends."""
 
     def __init__(self):
-        self.df = None
-        self.monthly_trends = None
+        self.df: pl.DataFrame | None = None
 
-    def load_csv(self, csv_content: str) -> pd.DataFrame:
+    def _clean_amount_column(self, df: pl.DataFrame, column: str) -> pl.DataFrame:
+        if column not in df.columns:
+            return df.with_columns(pl.lit(0.0).alias(column))
+
+        cleaned = (
+            pl.col(column)
+            .cast(pl.Utf8)
+            .str.replace_all("$", "")
+            .str.replace_all(",", "")
+            .str.strip()
+        )
+
+        return df.with_columns(
+            pl.when(cleaned == "")
+            .then(0.0)
+            .otherwise(cleaned.cast(pl.Float64))
+            .alias(column)
+        )
+
+    def load_csv(self, csv_content: str) -> pl.DataFrame:
         """Load CSV file content into a DataFrame."""
-        return pd.read_csv(io.StringIO(csv_content))
+        return pl.read_csv(io.StringIO(csv_content), try_parse_dates=True)
 
-    def load_file(self, file_path: str) -> pd.DataFrame:
+    def load_file(self, file_path: str) -> pl.DataFrame:
         """Load CSV file from path into a DataFrame."""
-        return pd.read_csv(file_path)
+        return pl.read_csv(file_path, try_parse_dates=True)
 
-    def parse_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
+    def parse_transactions(self, df: pl.DataFrame) -> pl.DataFrame:
         """Parse and clean transaction data from DataFrame."""
-        # Make a copy to avoid modifying original
-        df = df.copy()
-
-        print(f"DEBUG: Original columns: {df.columns.tolist()}")
+        df = df.clone()
 
         # Standardize column names
-        df.columns = df.columns.str.strip().str.lower()
-        
-        print(f"DEBUG: Standardized columns: {df.columns.tolist()}")
+        df.columns = [col.strip().lower() for col in df.columns]
 
         # Parse date column - handle multiple date column names
         date_col = None
@@ -39,80 +50,81 @@ class TransactionAnalyzer:
             if potential_date in df.columns:
                 date_col = potential_date
                 break
-        
+
         if date_col:
-            df["date"] = pd.to_datetime(df[date_col])
+            df = df.with_columns(
+                pl.col(date_col)
+                .cast(pl.Utf8)
+                .str.strptime(pl.Date, strict=False)
+                .alias("date")
+            )
         else:
-            raise ValueError(f"CSV must contain a date column. Available columns: {df.columns.tolist()}")
+            raise ValueError(f"CSV must contain a date column. Available columns: {df.columns}")
 
         # Handle outflow/inflow vs debit/credit formats
         if "outflow" in df.columns and "inflow" in df.columns:
-            # YNAB format
-            for col in ["outflow", "inflow"]:
-                df[col] = (
-                    df[col]
-                    .astype(str)
-                    .str.replace("$", "", regex=False)
-                    .str.replace(",", "", regex=False)
-                    .str.strip()
-                    .replace("", "0")
-                    .astype(float)
-                    .fillna(0)
-                )
-            df["outflow"] = df["outflow"].fillna(0)
-            df["inflow"] = df["inflow"].fillna(0)
+            df = self._clean_amount_column(df, "outflow")
+            df = self._clean_amount_column(df, "inflow")
         elif "debit" in df.columns and "credit" in df.columns:
-            # Bank statement format - debit is outflow, credit is inflow
-            for col in ["debit", "credit"]:
-                df[col] = (
-                    df[col]
-                    .astype(str)
-                    .str.replace("$", "", regex=False)
-                    .str.replace(",", "", regex=False)
-                    .str.strip()
-                    .replace("", "0")
-                    .astype(float)
-                    .fillna(0)
-                )
-            df["outflow"] = df["debit"].fillna(0)
-            df["inflow"] = df["credit"].fillna(0)
+            df = self._clean_amount_column(df, "debit")
+            df = self._clean_amount_column(df, "credit")
+            df = df.with_columns(
+                pl.col("debit").alias("outflow"),
+                pl.col("credit").alias("inflow"),
+            )
         else:
-            # Default to zeros if no amount columns exist
-            df["outflow"] = 0.0
-            df["inflow"] = 0.0
+            df = df.with_columns(
+                pl.lit(0.0).alias("outflow"),
+                pl.lit(0.0).alias("inflow"),
+            )
 
-        # Create net amount column
-        df["amount"] = df["inflow"] - df["outflow"]
+        df = df.with_columns((pl.col("inflow") - pl.col("outflow")).alias("amount"))
 
-        # Extract category - handle hierarchical categories
-        # YNAB format has "Category Group/Category" or just "Category"
         if "category group/category" in df.columns:
-            df["category"] = df["category group/category"].fillna("Uncategorized")
-            df["category_group"] = df["category"].str.split("|").str[0].str.strip()
-            df["category"] = df["category"].str.split("|").str[-1].str.strip()
+            df = df.with_columns(
+                pl.col("category group/category")
+                .fill_null("Uncategorized")
+                .cast(pl.Utf8)
+                .alias("category")
+            )
         elif "category" in df.columns:
-            df["category"] = df["category"].fillna("Uncategorized")
-            df["category_group"] = df["category"].str.split("|").str[0].str.strip()
-            df["category"] = df["category"].str.split("|").str[-1].str.strip()
+            df = df.with_columns(
+                pl.col("category")
+                .fill_null("Uncategorized")
+                .cast(pl.Utf8)
+                .alias("category")
+            )
         else:
-            df["category"] = "Uncategorized"
-            df["category_group"] = "Uncategorized"
+            df = df.with_columns(
+                pl.lit("Uncategorized").alias("category"),
+                pl.lit("Uncategorized").alias("category_group"),
+            )
 
-        # Determine transaction type for income/expense tracking
-        df["transaction_type"] = np.where(
-            df["inflow"] > df["outflow"],
-            "income",
-            np.where(df["outflow"] > df["inflow"], "expense", "transfer")
+        if "category" in df.columns and "category_group" not in df.columns:
+            df = df.with_columns(
+                pl.col("category").str.split("|").arr.get(0).str.strip().alias("category_group"),
+                pl.col("category").str.split("|").arr.get(-1).str.strip().alias("category"),
+            )
+        elif "category group/category" in df.columns:
+            df = df.with_columns(
+                pl.col("category").str.split("|").arr.get(0).str.strip().alias("category_group"),
+                pl.col("category").str.split("|").arr.get(-1).str.strip().alias("category"),
+            )
+
+        df = df.with_columns(
+            pl.when(pl.col("inflow") > pl.col("outflow"))
+            .then("income")
+            .when(pl.col("outflow") > pl.col("inflow"))
+            .then("expense")
+            .otherwise("transfer")
+            .alias("transaction_type"),
+            pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
         )
-
-        # Extract month-year for grouping
-        df["month"] = df["date"].dt.to_period("M")
-        df["month_str"] = df["date"].dt.strftime("%Y-%m")
 
         self.df = df
         return df
 
-    def get_monthly_trends(self, df: pd.DataFrame = None) -> Dict[str, Any]:
+    def get_monthly_trends(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Calculate monthly spending/income trends."""
         if df is None:
             df = self.df
@@ -120,25 +132,26 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Group by month and sum amounts
-        monthly = df.groupby("month_str").agg(
-            {
-                "amount": "sum",
-                "outflow": "sum",
-                "inflow": "sum",
-            }
-        ).reset_index()
-
-        monthly = monthly.sort_values("month_str")
+        monthly = (
+            df.groupby("month_str")
+            .agg(
+                [
+                    pl.col("amount").sum().round(2).alias("amount"),
+                    pl.col("outflow").sum().round(2).alias("outflow"),
+                    pl.col("inflow").sum().round(2).alias("inflow"),
+                ]
+            )
+            .sort("month_str")
+        )
 
         return {
-            "months": monthly["month_str"].tolist(),
-            "net_amounts": monthly["amount"].round(2).tolist(),
-            "outflows": monthly["outflow"].round(2).tolist(),
-            "inflows": monthly["inflow"].round(2).tolist(),
+            "months": monthly["month_str"].to_list(),
+            "net_amounts": monthly["amount"].to_list(),
+            "outflows": monthly["outflow"].to_list(),
+            "inflows": monthly["inflow"].to_list(),
         }
 
-    def get_category_trends(self, df: pd.DataFrame = None) -> Dict[str, Any]:
+    def get_category_trends(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get spending trends by category over time."""
         if df is None:
             df = self.df
@@ -146,38 +159,37 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Group by month and category, sum outflows
         category_monthly = (
-            df[df["outflow"] > 0]
-            .groupby(["month_str", "category"])["outflow"]
-            .sum()
-            .reset_index()
+            df.filter(pl.col("outflow") > 0)
+            .groupby(["month_str", "category"])
+            .agg(pl.col("outflow").sum().alias("outflow"))
+            .sort(["month_str", "category"])
         )
 
-        # Get unique months and categories
-        months = sorted(category_monthly["month_str"].unique())
-        categories = sorted(category_monthly["category"].unique())
+        months = sorted(category_monthly["month_str"].unique().to_list())
+        categories = sorted(category_monthly["category"].unique().to_list())
 
-        # Create a pivot table
-        pivot = category_monthly.pivot(
-            index="month_str", columns="category", values="outflow"
-        ).fillna(0)
+        pivot = (
+            category_monthly.pivot(
+                values="outflow",
+                index="month_str",
+                columns="category",
+                aggregate_function="sum",
+            )
+            .fill_null(0.0)
+        )
 
-        result = {
-            "months": months,
-            "categories": categories,
-            "data": {},
-        }
-
+        result = {"months": months, "categories": categories, "data": {}}
         for category in categories:
-            if category in pivot.columns:
-                result["data"][category] = pivot[category].round(2).tolist()
-            else:
-                result["data"][category] = [0] * len(months)
+            result["data"][category] = (
+                pivot[category].round(2).to_list()
+                if category in pivot.columns
+                else [0.0] * len(months)
+            )
 
         return result
 
-    def get_category_totals(self, df: pd.DataFrame = None) -> Dict[str, float]:
+    def get_category_totals(self, df: pl.DataFrame | None = None) -> Dict[str, float]:
         """Get total spending by category."""
         if df is None:
             df = self.df
@@ -185,14 +197,16 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Sum outflows by category
         totals = (
-            df[df["outflow"] > 0].groupby("category")["outflow"].sum().round(2)
+            df.filter(pl.col("outflow") > 0)
+            .groupby("category")
+            .agg(pl.col("outflow").sum().round(2).alias("outflow"))
+            .sort("category")
         )
 
-        return totals.to_dict()
+        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
 
-    def get_summary_stats(self, df: pd.DataFrame = None) -> Dict[str, float]:
+    def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, float]:
         """Get summary statistics."""
         if df is None:
             df = self.df
@@ -200,17 +214,32 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
+        total_inflow = float(df["inflow"].sum() or 0.0)
+        total_outflow = float(df["outflow"].sum() or 0.0)
+        monthly = (
+            df.groupby("month_str")
+            .agg(
+                [
+                    pl.col("inflow").sum().alias("monthly_inflow"),
+                    pl.col("outflow").sum().alias("monthly_outflow"),
+                ]
+            )
+        )
+
+        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
+        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+
         return {
-            "total_inflow": float(df["inflow"].sum().round(2)),
-            "total_outflow": float(df["outflow"].sum().round(2)),
-            "net_total": float((df["inflow"].sum() - df["outflow"].sum()).round(2)),
-            "avg_monthly_inflow": float(df.groupby("month_str")["inflow"].sum().mean().round(2)),
-            "avg_monthly_outflow": float(df.groupby("month_str")["outflow"].sum().mean().round(2)),
-            "transaction_count": len(df),
-            "unique_categories": df["category"].nunique(),
+            "total_inflow": round(total_inflow, 2),
+            "total_outflow": round(total_outflow, 2),
+            "net_total": round(total_inflow - total_outflow, 2),
+            "avg_monthly_inflow": round(avg_monthly_inflow, 2),
+            "avg_monthly_outflow": round(avg_monthly_outflow, 2),
+            "transaction_count": df.height,
+            "unique_categories": int(df["category"].n_unique()),
             "date_range": {
-                "start": str(df["date"].min().date()),
-                "end": str(df["date"].max().date()),
+                "start": str(df["date"].min()),
+                "end": str(df["date"].max()),
             },
         }
 

@@ -1,9 +1,10 @@
 """DuckDB database service for storing and managing transaction data."""
 
 import duckdb
-import pandas as pd
+import io
+import polars as pl
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import hashlib
 
 
@@ -91,22 +92,23 @@ class TransactionDatabase:
         self.conn.execute("DELETE FROM accounts")
         self.conn.execute("DELETE FROM categories")
 
-    def _compute_file_hash(self, df: pd.DataFrame) -> str:
+    def _compute_file_hash(self, df: pl.DataFrame) -> str:
         """Compute hash of dataframe for duplicate detection."""
-        # Use first few rows and columns to create a fingerprint
-        content = df.head(100).to_csv()
-        return hashlib.md5(content.encode()).hexdigest()
+        buffer = io.StringIO()
+        df.head(100).write_csv(buffer)
+        return hashlib.md5(buffer.getvalue().encode("utf-8")).hexdigest()
 
     def register_categories(self, categories: List[Dict[str, Any]]) -> None:
         """Register unique categories in the categories table."""
         if not categories:
             return
 
-        category_df = pd.DataFrame(categories).drop_duplicates(subset=["category_name"])
-        if category_df.empty:
+        category_df = pl.DataFrame(categories)
+        if category_df.is_empty():
             return
 
-        self.conn.register("new_categories", category_df)
+        category_df = category_df.unique(subset=["category_name"])
+        self.conn.register("new_categories", category_df.to_arrow())
         self.conn.execute("""
             INSERT INTO categories (category_name, category_group)
             SELECT DISTINCT category_name, category_group
@@ -320,17 +322,17 @@ class TransactionDatabase:
 
         return sorted(results, key=lambda a: (a["name"].lower(), a["type"].lower(), a["path"]))
 
-    def file_exists(self, df: pd.DataFrame) -> bool:
+    def file_exists(self, df: pl.DataFrame) -> bool:
         """Check if this file's data already exists in the database."""
         file_hash = self._compute_file_hash(df)
-        
+
         result = self.conn.execute("""
             SELECT COUNT(*) as count FROM transactions WHERE file_hash = ?
         """, [file_hash]).fetchall()
-        
+
         return result[0][0] > 0
 
-    def insert_transactions(self, df: pd.DataFrame, filename: str, account_name: str = None, account_type: str = None, account_path: str = None) -> Dict[str, Any]:
+    def insert_transactions(self, df: pl.DataFrame, filename: str, account_name: str = None, account_type: str = None, account_path: str = None) -> Dict[str, Any]:
         """Insert transactions into database and return summary."""
         file_hash = self._compute_file_hash(df)
         
@@ -351,33 +353,33 @@ class TransactionDatabase:
                 }
             }
 
-        df = df.copy()
+        df = df.clone()
 
         # Attach account metadata to transactions when available
-        if account_name and ("account" not in df.columns or df["account"].isna().all()):
-            df["account"] = account_name
-        if account_type and ("account_type" not in df.columns or df["account_type"].isna().all()):
-            df["account_type"] = account_type
-        if account_path and ("account_path" not in df.columns or df["account_path"].isna().all()):
-            df["account_path"] = account_path
+        if account_name and ("account" not in df.columns or df["account"].null_count() == df.height):
+            df = df.with_columns(pl.lit(account_name).alias("account"))
+        if account_type and ("account_type" not in df.columns or df["account_type"].null_count() == df.height):
+            df = df.with_columns(pl.lit(account_type).alias("account_type"))
+        if account_path and ("account_path" not in df.columns or df["account_path"].null_count() == df.height):
+            df = df.with_columns(pl.lit(account_path).alias("account_path"))
 
         if "category" not in df.columns:
-            df["category"] = "Uncategorized"
+            df = df.with_columns(pl.lit("Uncategorized").alias("category"))
         if "category_group" not in df.columns:
-            df["category_group"] = df["category"].astype(str).str.split("/").str[0].str.strip()
+            df = df.with_columns(
+                pl.col("category").cast(pl.Utf8).str.split("/").arr.get(0).str.strip().alias("category_group")
+            )
         if "transaction_type" not in df.columns:
-            df["transaction_type"] = df.apply(
-                lambda row: "income" if row["inflow"] > row["outflow"] else ("expense" if row["outflow"] > row["inflow"] else "transfer"),
-                axis=1
+            df = df.with_columns(
+                pl.when(pl.col("inflow") > pl.col("outflow"))
+                .then("income")
+                .when(pl.col("outflow") > pl.col("inflow"))
+                .then("expense")
+                .otherwise("transfer")
+                .alias("transaction_type")
             )
 
-        # Register categories from this dataset
-        categories = []
-        for _, row in df[["category", "category_group"]].drop_duplicates().iterrows():
-            categories.append({
-                "category_name": row["category"],
-                "category_group": row["category_group"]
-            })
+        categories = df.select(["category", "category_group"]).unique().to_dicts()
         self.register_categories(categories)
 
         # Prepare data for insertion
@@ -401,8 +403,8 @@ class TransactionDatabase:
                 "file_source": filename
             })
         
-        insert_df = pd.DataFrame(records)
-        self.conn.register("temp_insert", insert_df)
+        insert_df = pl.DataFrame(records)
+        self.conn.register("temp_insert", insert_df.to_arrow())
         self.conn.execute("""
             INSERT INTO transactions 
             (file_hash, account, account_type, account_path, date, payee, category, category_group, description, outflow, inflow, amount, transaction_type, month_year, file_source)
@@ -420,27 +422,33 @@ class TransactionDatabase:
             "filename": filename
         }
 
-    def get_transactions_by_date_range(self, start_date: str, end_date: str) -> pd.DataFrame:
+    def get_transactions_by_date_range(self, start_date: str, end_date: str) -> pl.DataFrame:
         """Retrieve transactions within a date range."""
-        return self.conn.execute("""
-            SELECT * FROM transactions 
-            WHERE date >= ? AND date <= ?
-            ORDER BY date DESC
-        """, [start_date, end_date]).df()
+        return pl.from_arrow(
+            self.conn.execute("""
+                SELECT * FROM transactions 
+                WHERE date >= ? AND date <= ?
+                ORDER BY date DESC
+            """, [start_date, end_date]).fetch_arrow_table()
+        )
 
-    def get_transactions_by_category(self, category: str) -> pd.DataFrame:
+    def get_transactions_by_category(self, category: str) -> pl.DataFrame:
         """Retrieve transactions for a specific category."""
-        return self.conn.execute("""
-            SELECT * FROM transactions 
-            WHERE category = ?
-            ORDER BY date DESC
-        """, [category]).df()
+        return pl.from_arrow(
+            self.conn.execute("""
+                SELECT * FROM transactions 
+                WHERE category = ?
+                ORDER BY date DESC
+            """, [category]).fetch_arrow_table()
+        )
 
-    def get_all_transactions(self) -> pd.DataFrame:
+    def get_all_transactions(self) -> pl.DataFrame:
         """Retrieve all transactions from database."""
-        return self.conn.execute("""
-            SELECT * FROM transactions ORDER BY date DESC
-        """).df()
+        return pl.from_arrow(
+            self.conn.execute("""
+                SELECT * FROM transactions ORDER BY date DESC
+            """).fetch_arrow_table()
+        )
 
     def get_database_stats(self) -> Dict[str, Any]:
         """Get statistics about the database."""

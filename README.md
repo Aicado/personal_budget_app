@@ -21,7 +21,7 @@ A full-stack application to analyze personal budget data and visualize monthly s
 ### Backend
 - **Python 3.10**
 - **FastAPI** for REST API
-- **Pandas** for data analysis
+- **Polars** with **PyArrow** for data analysis
 - **uv** for dependency management and virtual environments
 
 ## 📋 Prerequisites
