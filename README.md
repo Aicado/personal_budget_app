@@ -38,7 +38,8 @@ A full-stack application to analyze personal budget data and visualize monthly s
 # Install Node dependencies
 npm install
 
-# Install Python dependencies (uv handles this automatically)
+# Create / refresh the Python virtual environment and install dependencies
+uv venv --clear .venv
 uv sync
 ```
 
@@ -53,14 +54,18 @@ bash start.sh
 
 Terminal 1 - Backend:
 ```bash
-npm run dev:backend
-# or
+# Run backend with uv in development mode
 uv run -m uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Terminal 2 - Frontend:
 ```bash
 npm run dev
+```
+
+#### Option C: Run a Python script directly with uv
+```bash
+uv run python src/backend/your_script.py
 ```
 
 ### 3. Open in Browser
@@ -110,7 +115,7 @@ ynab-analyzer/
 ### Virtual Environment
 ```bash
 # Create/recreate virtual environment
-uv venv
+uv venv --clear .venv
 
 # Activate the environment (if using directly)
 source .venv/bin/activate
