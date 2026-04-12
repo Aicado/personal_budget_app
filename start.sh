@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start both backend and frontend
-echo "🚀 Starting YNAB Analyzer..."
+echo "🚀 Starting Personal Budget App..."
 echo ""
 echo "Starting backend on http://localhost:8000"
 echo "Starting frontend on http://localhost:5173"

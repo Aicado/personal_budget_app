@@ -11,7 +11,7 @@ import hashlib
 class TransactionDatabase:
     """Manages DuckDB database for transaction storage and retrieval."""
 
-    def __init__(self, db_path: str = "db/ynab_analyzer.duckdb"):
+    def __init__(self, db_path: str = "db/personal_budget_app.duckdb"):
         """Initialize DuckDB connection."""
         # Ensure db directory exists
         db_dir = Path(db_path).parent

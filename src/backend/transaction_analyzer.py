@@ -5,7 +5,7 @@ import polars as pl
 
 
 class TransactionAnalyzer:
-    """Analyzes YNAB transaction data and generates monthly trends."""
+    """Analyzes Personal Budget App transaction data and generates monthly trends."""
 
     def __init__(self):
         self.df: pl.DataFrame | None = None

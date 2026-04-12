@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# YNAB Analyzer Setup Script
-echo "🚀 Setting up YNAB Analyzer..."
+# Personal Budget App Setup Script
+echo "🚀 Setting up Personal Budget App..."
 
 # Install Node dependencies
 echo ""
