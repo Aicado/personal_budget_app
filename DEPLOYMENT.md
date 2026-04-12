@@ -1,4 +1,4 @@
-# YNAB Analyzer - Deployment Guide
+# Personal Budget App - Deployment Guide
 
 ## 🚀 Deployment Options
 
@@ -22,10 +22,10 @@ Open `http://localhost:5173` in your browser.
 
 ```bash
 # Build Docker image
-docker build -t ynab-analyzer .
+docker build -t personal-budget-app .
 
 # Run container
-docker run -p 8000:8000 -v $(pwd)/ynab_data:/app/ynab_data ynab-analyzer
+docker run -p 8000:8000 -v $(pwd)/transaction_data:/app/transaction_data personal-budget-app
 ```
 
 Access the app at `http://localhost:8000`
@@ -62,7 +62,7 @@ uv run -m uvicorn src.backend.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 # Create app
-heroku create ynab-analyzer
+heroku create personal-budget-app
 
 # Add buildpacks
 heroku buildpacks:add heroku/nodejs
@@ -87,7 +87,7 @@ git push heroku main
 
 ```bash
 # Deploy to Cloud Run
-gcloud run deploy ynab-analyzer \
+gcloud run deploy personal-budget-app \
   --source . \
   --port 8000 \
   --region us-central1
@@ -190,7 +190,7 @@ If adding persistent storage:
 ```bash
 # PostgreSQL
 docker run -d \
-  --name ynab-db \
+  --name personal-budget-db \
   -e POSTGRES_PASSWORD=secret \
   -v pgdata:/var/lib/postgresql/data \
   postgres:15

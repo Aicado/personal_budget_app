@@ -1,10 +1,10 @@
-# Personal Budget App (YNAB Analyzer)
+# Personal Budget App
 
 A high-performance full-stack application designed to analyze personal budget data, visualize spending trends, and manage historical transaction records. Unlike simple CSV viewers, this app uses a dedicated OLAP database (DuckDB) and a vectorized data processing engine (Polars) to provide deep insights into your financial habits.
 
 ## 🎯 Core Features
 
-- **Automated Data Ingestion**: Seamlessly processes YNAB CSV exports and "Current Balance" snapshots.
+- **Automated Data Ingestion**: Seamlessly processes various budget CSV exports and "Current Balance" snapshots.
 - **OLAP-Powered Analysis**: Uses DuckDB for lightning-fast queries across years of transaction data.
 - **Monthly Trends**: Visualize income, expenses, and net monthly trends with interactive reports.
 - **Category Intelligence**: Detailed spending breakdowns by category and category groups.
@@ -31,11 +31,11 @@ To prevent data corruption from repeated uploads, we use a **MD5 hashing strateg
 ### 🔄 Data Ingestion & Backfill Logic
 The ingestion engine (found in `src/backend/backfill.py` and `src/backend/transaction_analyzer.py`) follows a sophisticated pipeline:
 
-1. **Discovery**: The `backfill` script recursively scans the `data/` directory for `current.csv` (balances) and `ynab_data/*.csv` (transactions).
+1. **Discovery**: The `backfill` script recursively scans the `data/` directory for `current.csv` (balances) and `transaction_data/*.csv` (transactions).
 2. **Parsing (Polars)**: CSVs are loaded using Polars for high-speed cleaning. We handle:
    - Date standardization (MM/DD/YYYY to ISO).
    - Currency cleaning (removing symbols, handling empty strings).
-   - Column normalization (mapping YNAB's varying export formats).
+   - Column normalization (mapping varying CSV export formats).
 3. **Account Linkage**: Transactions are linked to specific account metadata extracted from the file structure (e.g., `data/Assets/Checking/current.csv` informs the app about the "Checking" account).
 4. **Current Balance vs. Transactions**:
    - **Transactions** provide the historical "story".
@@ -96,7 +96,7 @@ bash start.sh
 │   ├── Assets/            # Account-specific directories
 │   │   └── Checking/
 │   │       └── current.csv # Account balance snapshots
-│   └── ynab_data/         # Historical transaction exports
+│   └── transaction_data/         # Historical transaction exports
 ├── pyproject.toml         # Python dependencies (managed by uv)
 └── package.json           # Frontend dependencies
 ```
@@ -131,4 +131,4 @@ uv sync
 ---
 
 ## 🔐 Privacy
-Your financial data is **never** uploaded to a server. All processing happens in-memory or in your local DuckDB file located at `db/ynab_analyzer.duckdb`.
+Your financial data is **never** uploaded to a server. All processing happens in-memory or in your local DuckDB file located at `db/personal_budget_app.duckdb`.

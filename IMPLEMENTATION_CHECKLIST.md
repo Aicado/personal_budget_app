@@ -2,7 +2,7 @@
 
 ## ✨ Project Complete!
 
-This document verifies all components of the YNAB Analyzer project have been successfully implemented.
+This document verifies all components of the Personal Budget App project have been successfully implemented.
 
 ## 🎯 Core Application
 
@@ -94,7 +94,7 @@ This document verifies all components of the YNAB Analyzer project have been suc
 ## 🧪 Testing & Validation
 
 ### Backend Testing
-- [x] Transaction analyzer tested with real YNAB data
+- [x] Transaction analyzer tested with real Personal Budget App data
   - [x] ✅ 3,165 transactions loaded
   - [x] ✅ Date range: 2023-11-22 to 2026-01-14
   - [x] ✅ Total income: $1,299,140.07
@@ -129,13 +129,13 @@ This document verifies all components of the YNAB Analyzer project have been suc
 - [x] `npm run dev:backend` - Start backend
 - [x] `npm run dev` - Start frontend
 - [x] `uv run -m uvicorn ...` - Direct Python
-- [x] Docker: `docker build -t ynab-analyzer .`
+- [x] Docker: `docker build -t personal-budget-app .`
 - [x] Docker Compose: `docker-compose up`
 
 ## 📁 Project Structure Complete
 
 ```
-✅ ynab-analyzer/
+✅ personal-budget-app/
    ✅ src/
       ✅ backend/
          ✅ __init__.py
@@ -251,12 +251,12 @@ This document verifies all components of the YNAB Analyzer project have been suc
 1. **Setup**: `make setup` (one time)
 2. **Run**: `make dev` (or separate terminals)
 3. **Access**: http://localhost:5173
-4. **Upload**: YNAB CSV files
+4. **Upload**: Personal Budget App CSV files
 5. **Analyze**: View instant results
 
 ## ✨ Next Steps for Users
 
-- [ ] Export YNAB data to CSV
+- [ ] Export Personal Budget App data to CSV
 - [ ] Upload to the application
 - [ ] View spending trends
 - [ ] Customize styling if desired
@@ -280,7 +280,7 @@ Ready for development and production use!
 
 ### To Get Started:
 ```bash
-cd /Users/laxmanpanthi/ynab-analyzer
+cd /Users/laxmanpanthi/personal-budget-app
 make setup
 make dev
 ```

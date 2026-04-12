@@ -1,7 +1,7 @@
 .PHONY: help setup install dev dev-backend dev-frontend build test clean lint format
 
 help:
-	@echo "YNAB Analyzer - Available Commands"
+	@echo "Personal Budget App - Available Commands"
 	@echo ""
 	@echo "Setup & Installation:"
 	@echo "  make setup       - Setup the project (install dependencies)"

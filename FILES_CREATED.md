@@ -286,9 +286,9 @@
 
 ## Data Directory
 
-### `ynab_data/`
+### `transaction_data/`
 **Purpose**: Sample transaction files
-- Contains real YNAB export files
+- Contains real Personal Budget App export files
 - Used for testing
 - Multiple export formats included
 (Pre-existing, not modified)

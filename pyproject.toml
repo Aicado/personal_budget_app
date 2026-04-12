@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "personal-budget-app"
 version = "0.1.0"
-description = "A transaction analyzer that reads YNAB data and creates monthly trends"
+description = "A transaction analyzer that reads Personal Budget App data and creates monthly trends"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
