@@ -119,15 +119,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, selectedAccount, 
       )}
 
       <nav className="sidebar-nav">
-        {/* Home Link */}
+        {/* Main Navigation */}
         <div className="nav-section">
           <button
-            className={`nav-home ${currentPage === 'home' ? 'active' : ''}`}
-            onClick={() => onNavigate('home')}
+            className={`nav-home ${currentPage === 'dashboard' ? 'active' : ''}`}
+            onClick={() => onNavigate('dashboard')}
           >
-            <span className="nav-icon">🏠</span>
-            <span className="nav-label">Home</span>
-            <span className="nav-description">All Transactions</span>
+            <span className="nav-icon">📊</span>
+            <span className="nav-label">Dashboard</span>
+            <span className="nav-description">Overview</span>
+          </button>
+          <button
+            className={`nav-home ${currentPage === 'transactions' ? 'active' : ''}`}
+            onClick={() => onNavigate('transactions')}
+          >
+            <span className="nav-icon">💱</span>
+            <span className="nav-label">Transactions</span>
+            <span className="nav-description">All Accounts</span>
           </button>
         </div>
 

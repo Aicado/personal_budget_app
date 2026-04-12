@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import './App.css'
 import { Sidebar } from './components/Sidebar'
-import { HomePage } from './components/HomePage'
+import { DashboardHome } from './components/DashboardHome'
+import { AllTransactionsPage } from './components/AllTransactionsPage'
 import { AccountDetail } from './components/AccountDetail'
 
-type PageType = 'home' | 'account'
+type PageType = 'dashboard' | 'transactions' | 'account'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('home')
+  const [currentPage, setCurrentPage] = useState<PageType>('dashboard')
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null)
 
   const handleNavigate = (page: string, account?: string) => {
@@ -15,7 +16,7 @@ function App() {
     setCurrentPage(pageType)
     if (pageType === 'account' && account) {
       setSelectedAccount(account)
-    } else if (pageType === 'home') {
+    } else if (pageType === 'dashboard' || pageType === 'transactions') {
       setSelectedAccount(null)
     }
   }
@@ -37,11 +38,12 @@ function App() {
         />
 
         <main className="app-main">
-          {currentPage === 'home' && <HomePage />}
+          {currentPage === 'dashboard' && <DashboardHome />}
+          {currentPage === 'transactions' && <AllTransactionsPage />}
           {currentPage === 'account' && selectedAccount && (
             <AccountDetail 
               accountName={selectedAccount}
-              onBack={() => handleNavigate('home')}
+              onBack={() => handleNavigate('dashboard')}
             />
           )}
         </main>
