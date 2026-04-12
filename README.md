@@ -1,293 +1,134 @@
-# Personal Budget App
+# Personal Budget App (YNAB Analyzer)
 
-A full-stack application to analyze personal budget data and visualize monthly spending trends, similar to YNAB's built-in reports.
+A high-performance full-stack application designed to analyze personal budget data, visualize spending trends, and manage historical transaction records. Unlike simple CSV viewers, this app uses a dedicated OLAP database (DuckDB) and a vectorized data processing engine (Polars) to provide deep insights into your financial habits.
 
-## 🎯 Features
+## 🎯 Core Features
 
-- **File Upload**: Upload YNAB transaction export CSV files
-- **Monthly Trends**: Visualize income, expenses, and net monthly trends
-- **Category Breakdown**: See top spending categories with percentage breakdowns
-- **Summary Statistics**: Get comprehensive stats about your finances
-- **Multi-file Support**: Analyze multiple transaction files at once
-- **Responsive Design**: Works on desktop and mobile devices
+- **Automated Data Ingestion**: Seamlessly processes YNAB CSV exports and "Current Balance" snapshots.
+- **OLAP-Powered Analysis**: Uses DuckDB for lightning-fast queries across years of transaction data.
+- **Monthly Trends**: Visualize income, expenses, and net monthly trends with interactive reports.
+- **Category Intelligence**: Detailed spending breakdowns by category and category groups.
+- **Multi-File Support**: Aggregates data from multiple accounts and time periods into a unified view.
+- **Local-First Security**: All data is processed and stored locally on your machine.
 
-## 🛠 Tech Stack
+---
 
-### Frontend
-- **React 19** with TypeScript
-- **Vite** for fast development and building
-- **CSS3** for styling with responsive design
+## 🏗 Backend Architecture & Database
 
-### Backend
-- **Python 3.10**
-- **FastAPI** for REST API
-- **Polars** with **PyArrow** for data analysis
-- **uv** for dependency management and virtual environments
+The backend is built with **FastAPI**, **DuckDB**, and **Polars**, focusing on speed, reliability, and ease of data management.
 
-## 📋 Prerequisites
+### 🗄 Database Schema (DuckDB)
+The application uses **DuckDB**, an in-process SQL OLAP database management system. It is optimized for analytical queries and handles large datasets with minimal overhead.
 
-- Node.js 16+ (for frontend)
-- Python 3.10+ (for backend)
-- `uv` Python package manager ([install uv](https://docs.astral.sh/uv/))
+The schema consists of three primary tables:
+- `transactions`: Stores every individual transaction with metadata (account, category, inflow/outflow, etc.).
+- `accounts`: Stores current balance snapshots, including `net_value`, `current_debit`, and `current_credit`.
+- `categories`: Maintains a registry of unique categories and their parent groups.
+
+#### Duplicate Detection
+To prevent data corruption from repeated uploads, we use a **MD5 hashing strategy**. Before insertion, a hash is generated from the CSV content. If the hash exists in the `transactions` table, the upload is safely ignored.
+
+### 🔄 Data Ingestion & Backfill Logic
+The ingestion engine (found in `src/backend/backfill.py` and `src/backend/transaction_analyzer.py`) follows a sophisticated pipeline:
+
+1. **Discovery**: The `backfill` script recursively scans the `data/` directory for `current.csv` (balances) and `ynab_data/*.csv` (transactions).
+2. **Parsing (Polars)**: CSVs are loaded using Polars for high-speed cleaning. We handle:
+   - Date standardization (MM/DD/YYYY to ISO).
+   - Currency cleaning (removing symbols, handling empty strings).
+   - Column normalization (mapping YNAB's varying export formats).
+3. **Account Linkage**: Transactions are linked to specific account metadata extracted from the file structure (e.g., `data/Assets/Checking/current.csv` informs the app about the "Checking" account).
+4. **Current Balance vs. Transactions**:
+   - **Transactions** provide the historical "story".
+   - **Current Balances** provide the "state of the union" at a specific point in time.
+   - The app merges these two sources to provide a complete picture of net worth alongside spending trends.
+
+---
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Prerequisites
+- Python 3.10+
+- `uv` ([Install uv](https://docs.astral.sh/uv/))
+- Node.js 18+
 
+### 2. Setup & Installation
 ```bash
-# Install Node dependencies
-npm install
+# Install all dependencies (Python & Node)
+bash setup.sh
 
-# Create / refresh the Python virtual environment and install dependencies
-uv venv --clear .venv
+# Alternatively, using uv directly
+uv venv
 uv sync
+npm install
 ```
 
-### 2. Run the Application
-
-#### Option A: Run both frontend and backend together
+### 3. Run the Application
 ```bash
+# Start both Backend (8000) and Frontend (5173)
 bash start.sh
 ```
 
-#### Option B: Run separately (recommended for development)
+---
 
-Terminal 1 - Backend:
-```bash
-# Run backend with uv in development mode
-uv run -m uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000
-```
+## 🛠 Tech Stack
 
-Terminal 2 - Frontend:
-```bash
-npm run dev
-```
+- **Frontend**: React 19, TypeScript, Vite, CSS3
+- **Backend**: FastAPI (Python)
+- **Data Engine**: Polars (Vectorized processing)
+- **Database**: DuckDB (Analytical SQL)
+- **Package Management**: `uv` (Python), `npm` (Node)
 
-#### Option C: Run a Python script directly with uv
-```bash
-uv run python src/backend/your_script.py
-```
-
-### 3. Open in Browser
-Navigate to `http://localhost:5173`
+---
 
 ## 📁 Project Structure
 
 ```
-ynab-analyzer/
+.
 ├── src/
-│   ├── backend/                    # Python FastAPI backend
-│   │   ├── main.py                # FastAPI application
-│   │   ├── transaction_analyzer.py # Core analysis logic
-│   │   └── __init__.py
-│   ├── components/                # React components
-│   │   ├── FileUpload.tsx
-│   │   ├── MonthlySummary.tsx
-│   │   ├── CategoryBreakdown.tsx
-│   │   ├── SummaryStats.tsx
-│   │   └── *.css                  # Component styles
-│   ├── App.tsx                    # Main React component
-│   ├── main.tsx                   # React entry point
-│   ├── App.css
-│   └── index.css
-├── ynab_data/                     # Sample YNAB export files
-├── pyproject.toml                 # Python project configuration
-├── package.json                   # Node.js project configuration
-├── vite.config.ts                 # Vite configuration
-├── tsconfig.json                  # TypeScript configuration
-├── setup.sh                        # Setup script
-├── start.sh                        # Start script
-└── README.md                       # This file
+│   ├── backend/           # FastAPI, DuckDB logic, Polars analyzers
+│   │   ├── database.py    # DuckDB schema & connection management
+│   │   ├── backfill.py    # Automated data ingestion logic
+│   │   ├── main.py        # API endpoints
+│   │   └── transaction_analyzer.py # Data cleaning & stats
+│   ├── components/        # React UI components
+│   └── App.tsx            # Main frontend entry
+├── data/                  # Root for your CSV data
+│   ├── Assets/            # Account-specific directories
+│   │   └── Checking/
+│   │       └── current.csv # Account balance snapshots
+│   └── ynab_data/         # Historical transaction exports
+├── pyproject.toml         # Python dependencies (managed by uv)
+└── package.json           # Frontend dependencies
 ```
-
-## 📊 How to Use
-
-1. **Export from YNAB**: Export your transaction data from YNAB as CSV files
-2. **Upload Files**: Click the upload area and select one or multiple CSV files
-3. **View Analysis**: The app will automatically analyze and display:
-   - Summary statistics (total income, expenses, net)
-   - Monthly trends with interactive visualizations
-   - Top spending categories
-   - Date range and transaction count
-
-## 🔧 Environment Management with uv
-
-### Virtual Environment
-```bash
-# Create/recreate virtual environment
-uv venv --clear .venv
-
-# Activate the environment (if using directly)
-source .venv/bin/activate
-```
-
-### Dependency Management
-```bash
-# Sync dependencies from pyproject.toml
-uv sync
-
-# Add a new dependency
-uv add <package-name>
-
-# Remove a dependency
-uv remove <package-name>
-
-# Update dependencies
-uv lock --upgrade
-```
-
-### Running Commands
-```bash
-# Run with the managed environment
-uv run <command>
-
-# Run Python scripts
-uv run python script.py
-
-# Run the backend server
-uv run -m uvicorn src.backend.main:app --reload
-```
-
-## 🏗 Building for Production
-
-### Frontend
-```bash
-npm run build
-# Output: dist/
-```
-
-### Backend Deployment
-```bash
-# Build with uv
-uv build
-
-# Or use directly with:
-uv run -m uvicorn src.backend.main:app --host 0.0.0.0 --port 8000
-```
-
-## 📝 API Endpoints
-
-### POST /analyze
-Upload a single CSV file for analysis.
-
-**Request:**
-```bash
-curl -X POST -F "file=@transactions.csv" http://localhost:8000/analyze
-```
-
-**Response:**
-```json
-{
-  "filename": "transactions.csv",
-  "monthly_trends": { ... },
-  "category_trends": { ... },
-  "category_totals": { ... },
-  "summary_stats": { ... }
-}
-```
-
-### POST /analyze-multiple
-Upload multiple CSV files for combined analysis.
-
-**Request:**
-```bash
-curl -X POST -F "files=@file1.csv" -F "files=@file2.csv" http://localhost:8000/analyze-multiple
-```
-
-### GET /health
-Health check endpoint.
-
-## 🎨 Customization
-
-### Styling
-All component styles are in individual `.css` files in `src/components/`. Modify colors and layouts as needed.
-
-### Data Analysis
-Modify `src/backend/transaction_analyzer.py` to add custom analysis features.
-
-## 📦 Adding Dependencies
-
-### Frontend (Node.js)
-```bash
-npm install <package-name>
-```
-
-### Backend (Python)
-```bash
-uv add <package-name>
-```
-
-## 🐛 Troubleshooting
-
-### Backend won't start
-```bash
-# Check if port 8000 is in use
-lsof -i :8000
-# Kill the process if needed
-kill -9 <PID>
-```
-
-### Frontend won't connect to backend
-- Make sure backend is running on `http://localhost:8000`
-- Check CORS settings in `src/backend/main.py`
-- Check browser console for error messages
-
-### CSV parsing errors
-- Ensure CSV format matches YNAB export format
-- Check column names (should include: Date, Category, Outflow, Inflow)
-- Verify CSV encoding is UTF-8
-
-## 📚 CSV Format Requirements
-
-Your YNAB export CSV should have these columns:
-- `Date` - Transaction date (MM/DD/YYYY format)
-- `Payee` - Transaction payee
-- `Category` - Transaction category
-- `Outflow` - Money spent
-- `Inflow` - Money received
-
-## 🔐 Security Notes
-
-- Only process your own financial data
-- This app runs locally by default
-- Uploaded files are not stored permanently
-- For production, implement proper authentication
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to submit issues and pull requests.
-
-## 📞 Support
-
-For issues or questions, please open a GitHub issue or contact the maintainer.
 
 ---
 
-Happy budgeting! 💰📊
-import reactDom from 'eslint-plugin-react-dom'
+## 🔧 Development with `uv`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+This project leverages `uv` for extremely fast dependency management.
+
+```bash
+# Add a new Python package
+uv add <package>
+
+# Run a script in the managed environment
+uv run python src/backend/backfill.py
+
+# Sync the environment
+uv sync
 ```
+
+---
+
+## 📝 API Endpoints
+
+- `POST /analyze`: Process a single CSV and return statistics.
+- `POST /analyze-multiple`: Batch process multiple files.
+- `GET /accounts/status`: View which accounts have transactions vs. current balances.
+- `GET /net-worth/current-balances`: Aggregated net worth view.
+- `GET /database/stats`: Overview of records stored in DuckDB.
+
+---
+
+## 🔐 Privacy
+Your financial data is **never** uploaded to a server. All processing happens in-memory or in your local DuckDB file located at `db/ynab_analyzer.duckdb`.
