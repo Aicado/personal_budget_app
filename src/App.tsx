@@ -1,21 +1,24 @@
 import { useState } from 'react'
 import './App.css'
-import { AccountsTab } from './components/tabs/AccountsTab'
-import { IncomeExpenseTab } from './components/tabs/IncomeExpenseTab'
-import { NetWorthTab } from './components/tabs/NetWorthTab'
-import { SpendingTrendsTab } from './components/tabs/SpendingTrendsTab'
+import { Sidebar } from './components/Sidebar'
+import { HomePage } from './components/HomePage'
+import { AccountDetail } from './components/AccountDetail'
 
-type TabType = 'accounts' | 'income-expense' | 'net-worth' | 'spending-trends'
+type PageType = 'home' | 'account'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('accounts')
+  const [currentPage, setCurrentPage] = useState<PageType>('home')
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null)
 
-  const tabs: Array<{ id: TabType; label: string; icon: string }> = [
-    { id: 'accounts', label: 'Accounts', icon: '💳' },
-    { id: 'income-expense', label: 'Income/Expense', icon: '💰' },
-    { id: 'net-worth', label: 'Net Worth', icon: '📊' },
-    { id: 'spending-trends', label: 'Spending Trends', icon: '📈' },
-  ]
+  const handleNavigate = (page: string, account?: string) => {
+    const pageType = page as PageType
+    setCurrentPage(pageType)
+    if (pageType === 'account' && account) {
+      setSelectedAccount(account)
+    } else if (pageType === 'home') {
+      setSelectedAccount(null)
+    }
+  }
 
   return (
     <div className="app">
@@ -26,25 +29,21 @@ function App() {
         </div>
       </header>
 
-      <div className="tabs-container">
-        <nav className="tabs-nav">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="tab-icon">{tab.icon}</span>
-              <span className="tab-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
+      <div className="app-container">
+        <Sidebar 
+          currentPage={currentPage} 
+          selectedAccount={selectedAccount}
+          onNavigate={handleNavigate}
+        />
 
         <main className="app-main">
-          {activeTab === 'accounts' && <AccountsTab />}
-          {activeTab === 'income-expense' && <IncomeExpenseTab />}
-          {activeTab === 'net-worth' && <NetWorthTab />}
-          {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          {currentPage === 'home' && <HomePage />}
+          {currentPage === 'account' && selectedAccount && (
+            <AccountDetail 
+              accountName={selectedAccount}
+              onBack={() => handleNavigate('home')}
+            />
+          )}
         </main>
       </div>
 

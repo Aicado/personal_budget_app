@@ -26,12 +26,19 @@
   font-weight: 300;
 }
 
+.app-container {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  max-width: none;
+}
+
 .app-main {
   flex: 1;
   width: 100%;
-  margin: 0 auto;
   padding: 2rem;
-  max-width: none;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 .results-section {
@@ -73,6 +80,10 @@
 
   .subtitle {
     font-size: 0.95rem;
+  }
+
+  .app-container {
+    flex-direction: column;
   }
 
   .app-main {

@@ -1,0 +1,368 @@
+/* Home Page Styling */
+.home-page {
+  width: 100%;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.home-header {
+  margin-bottom: 2rem;
+}
+
+.home-header h1 {
+  font-size: 2.2rem;
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+}
+
+.home-header p {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 1rem;
+}
+
+/* Error Banner */
+.error-banner {
+  padding: 1rem;
+  background-color: #fadbd8;
+  border-left: 4px solid #e74c3c;
+  border-radius: 4px;
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.error-banner p {
+  margin: 0;
+  color: #c0392b;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(102, 126, 234, 0.1);
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Balance Summary */
+.balance-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #667eea;
+  transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.summary-card h3 {
+  margin: 0 0 1rem 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.summary-value.positive {
+  color: #27ae60;
+}
+
+.summary-value.negative {
+  color: #e74c3c;
+}
+
+.summary-value.warning {
+  color: #f39c12;
+}
+
+/* Account Filter */
+.account-filter {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.account-filter label {
+  font-weight: 600;
+  color: #34495e;
+  white-space: nowrap;
+}
+
+.account-filter select {
+  padding: 0.75rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #34495e;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  max-width: 300px;
+}
+
+.account-filter select:hover,
+.account-filter select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  outline: none;
+}
+
+/* Transactions Section */
+.transactions-section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  padding: 1.5rem;
+}
+
+.transactions-section h2 {
+  margin: 0 0 1.5rem 0;
+  color: #2c3e50;
+  font-size: 1.4rem;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Transactions Container */
+.transactions-container {
+  overflow-x: auto;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.transactions-table thead {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #ecf0f1;
+}
+
+.transactions-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #34495e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.8rem;
+}
+
+.transactions-table tbody tr {
+  border-bottom: 1px solid #ecf0f1;
+  transition: all 0.2s ease;
+}
+
+.transactions-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.transactions-table tbody tr.duplicate-row {
+  background-color: #fef5e7;
+  border-left: 4px solid #f39c12;
+}
+
+.transactions-table tbody tr.duplicate-row:hover {
+  background-color: #fcebd0;
+}
+
+.transactions-table td {
+  padding: 1rem;
+  color: #34495e;
+}
+
+.date-cell {
+  font-weight: 600;
+  color: #667eea;
+  white-space: nowrap;
+}
+
+.account-cell {
+  font-weight: 500;
+  color: #5d6d7b;
+}
+
+.payee-cell {
+  font-weight: 500;
+}
+
+.category-cell {
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.value-cell {
+  text-align: right;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.value-cell.positive {
+  color: #27ae60;
+}
+
+.value-cell.negative {
+  color: #e74c3c;
+}
+
+.status-cell {
+  text-align: center;
+  font-size: 1rem;
+}
+
+.duplicate-badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background-color: #f39c12;
+  color: white;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .home-page {
+    padding: 0;
+  }
+
+  .home-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .balance-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .summary-card {
+    padding: 1rem;
+  }
+
+  .summary-value {
+    font-size: 1.5rem;
+  }
+
+  .account-filter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-filter select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .transactions-table {
+    font-size: 0.8rem;
+  }
+
+  .transactions-table th,
+  .transactions-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .transactions-table tbody tr.duplicate-row {
+    border-left-width: 2px;
+  }
+
+  .duplicate-badge {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .balance-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-table {
+    font-size: 0.75rem;
+  }
+
+  .transactions-table th,
+  .transactions-table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .date-cell,
+  .payee-cell,
+  .category-cell {
+    display: none;
+  }
+
+  .value-cell {
+    text-align: right;
+  }
+}
