@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  ynab-analyzer:
+  personal-budget-app:
     build: .
     ports:
       - "8000:8000"

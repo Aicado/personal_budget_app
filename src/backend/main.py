@@ -18,7 +18,7 @@ def load_data_on_startup():
     """Automatically load data from the data directory when the app starts."""
     project_root = Path(__file__).parent.parent.parent
     accounts_dir = project_root / "data"
-    transactions_dir = project_root / "data" / "ynab_data"
+    transactions_dir = project_root / "data" / "transaction_data"
     if accounts_dir.exists() or transactions_dir.exists():
         try:
             backfill_database(str(accounts_dir), str(transactions_dir))

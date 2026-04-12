@@ -118,9 +118,9 @@ uv run --with pytest --with black
 
 ```toml
 [project]
-name = "ynab-analyzer"
+name = "personal-budget-app"
 version = "0.1.0"
-description = "YNAB transaction analyzer"
+description = "Personal Budget App transaction analyzer"
 requires-python = ">=3.10"
 
 # Main dependencies

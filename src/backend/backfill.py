@@ -1,4 +1,4 @@
-"""Backfill script to populate DuckDB with existing YNAB CSV data."""
+"""Backfill script to populate DuckDB with existing Personal Budget App CSV data."""
 
 import os
 from pathlib import Path
@@ -41,11 +41,11 @@ def get_account_metadata(csv_path: Path, base_dir: Path) -> Dict[str, str]:
         "account_path": None,
     }
 
-    if len(parts) >= 3 and parts[0].lower() != "ynab_data":
+    if len(parts) >= 3 and parts[0].lower() != "transaction_data":
         metadata["account_type"] = parts[0]
         metadata["account_name"] = parts[1]
         metadata["account_path"] = "/".join(parts[:-1])
-    elif len(parts) >= 2 and parts[0].lower() != "ynab_data":
+    elif len(parts) >= 2 and parts[0].lower() != "transaction_data":
         metadata["account_type"] = parts[0]
         metadata["account_name"] = parts[1]
         metadata["account_path"] = "/".join(parts[:-1])
@@ -53,7 +53,7 @@ def get_account_metadata(csv_path: Path, base_dir: Path) -> Dict[str, str]:
     return metadata
 
 
-def backfill_database(accounts_dir: str = "data", transactions_dir: str = "ynab_data") -> Dict[str, Any]:
+def backfill_database(accounts_dir: str = "data", transactions_dir: str = "transaction_data") -> Dict[str, Any]:
     """Backfill DuckDB with account definitions from accounts_dir and transactions from transactions_dir."""
     db = TransactionDatabase()
     db.clear_tables()

@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions - Personal Budget App
 
-You are an expert Python and React engineer assisting with the development of the YNAB Analyzer.
+You are an expert Python and React engineer assisting with the development of the Personal Budget App.
 
 ## 🐍 Backend Development (FastAPI, Polars, DuckDB)
 
@@ -28,7 +28,7 @@ You are an expert Python and React engineer assisting with the development of th
 - Transaction amounts should follow: `amount = inflow - outflow`.
 
 ### Data Hierarchy
-- `ynab_data/*.csv`: Historical transactions.
+- `transaction_data/*.csv`: Historical transactions.
 - `data/**/current.csv`: Real-time account balance snapshots.
 - Accounts are identified by their path in the `data/` directory.
 
