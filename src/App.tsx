@@ -21,22 +21,28 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>📊 Personal Budget App</h1>
+          <h1>
+            <span aria-hidden="true">📊</span> Personal Budget App
+          </h1>
           <p className="subtitle">Automatically load account and transaction data from the backend data store</p>
         </div>
       </header>
 
       <div className="tabs-container">
-        <nav className="tabs-nav" role="tablist" aria-label="Main navigation">
+        <nav className="tabs-nav" role="tablist" aria-label="Main navigation" role="tablist" aria-label="Dashboard sections">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              id={`tab-${tab.id}`}
               id={`${tab.id}-tab`}
               role="tab"
               aria-selected={activeTab === tab.id}
               aria-controls={`${tab.id}-panel`}
               className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`panel-${tab.id}`}
             >
               <span className="tab-icon" aria-hidden="true">
                 {tab.icon}
@@ -48,15 +54,23 @@ function App() {
 
         <main className="app-main">
           <div
+            key={activeTab}
+            id={`panel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`tab-${activeTab}`}
+            className="results-section"
+          >
+            <div
             id={`${activeTab}-panel`}
             role="tabpanel"
             aria-labelledby={`${activeTab}-tab`}
             tabIndex={0}
           >
             {activeTab === 'accounts' && <AccountsTab />}
-            {activeTab === 'income-expense' && <IncomeExpenseTab />}
-            {activeTab === 'net-worth' && <NetWorthTab />}
-            {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+              {activeTab === 'income-expense' && <IncomeExpenseTab />}
+              {activeTab === 'net-worth' && <NetWorthTab />}
+              {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          </div>
           </div>
         </main>
       </div>
