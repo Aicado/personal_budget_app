@@ -27,24 +27,37 @@ function App() {
       </header>
 
       <div className="tabs-container">
-        <nav className="tabs-nav">
+        <nav className="tabs-nav" role="tablist" aria-label="Main navigation">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              id={`${tab.id}-tab`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`${tab.id}-panel`}
               className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-icon" aria-hidden="true">
+                {tab.icon}
+              </span>
               <span className="tab-label">{tab.label}</span>
             </button>
           ))}
         </nav>
 
         <main className="app-main">
-          {activeTab === 'accounts' && <AccountsTab />}
-          {activeTab === 'income-expense' && <IncomeExpenseTab />}
-          {activeTab === 'net-worth' && <NetWorthTab />}
-          {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          <div
+            id={`${activeTab}-panel`}
+            role="tabpanel"
+            aria-labelledby={`${activeTab}-tab`}
+            tabIndex={0}
+          >
+            {activeTab === 'accounts' && <AccountsTab />}
+            {activeTab === 'income-expense' && <IncomeExpenseTab />}
+            {activeTab === 'net-worth' && <NetWorthTab />}
+            {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          </div>
         </main>
       </div>
 
