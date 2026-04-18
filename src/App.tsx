@@ -21,26 +21,35 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>📊 Personal Budget App</h1>
+          <h1>
+            <span aria-hidden="true">📊</span> Personal Budget App
+          </h1>
           <p className="subtitle">Automatically load account and transaction data from the backend data store</p>
         </div>
       </header>
 
       <div className="tabs-container">
-        <nav className="tabs-nav">
+        <nav className="tabs-nav" role="tablist" aria-label="Financial data views">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              id={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`panel-${tab.id}`}
+              aria-label={tab.label}
               className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-icon" aria-hidden="true">
+                {tab.icon}
+              </span>
               <span className="tab-label">{tab.label}</span>
             </button>
           ))}
         </nav>
 
-        <main className="app-main">
+        <main className="app-main" role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={activeTab}>
           {activeTab === 'accounts' && <AccountsTab />}
           {activeTab === 'income-expense' && <IncomeExpenseTab />}
           {activeTab === 'net-worth' && <NetWorthTab />}
@@ -49,7 +58,10 @@ function App() {
       </div>
 
       <footer className="app-footer">
-        <p>💡 Tip: Account and transaction data are loaded automatically from the backend data directory.</p>
+        <p>
+          <span aria-hidden="true">💡</span> Tip: Account and transaction data are loaded automatically from the
+          backend data directory.
+        </p>
       </footer>
     </div>
   )

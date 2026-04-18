@@ -38,6 +38,12 @@
   transform: translateY(-2px);
 }
 
+.tab-button:focus-visible {
+  outline: 3px solid #667eea;
+  outline-offset: -3px;
+  z-index: 1;
+}
+
 .tab-button.active {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
