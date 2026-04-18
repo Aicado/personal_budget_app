@@ -21,30 +21,46 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <h1>📊 Personal Budget App</h1>
+          <h1>
+            <span aria-hidden="true">📊</span> Personal Budget App
+          </h1>
           <p className="subtitle">Automatically load account and transaction data from the backend data store</p>
         </div>
       </header>
 
       <div className="tabs-container">
-        <nav className="tabs-nav">
+        <nav className="tabs-nav" role="tablist" aria-label="Dashboard sections">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              id={`tab-${tab.id}`}
               className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`panel-${tab.id}`}
             >
-              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-icon" aria-hidden="true">
+                {tab.icon}
+              </span>
               <span className="tab-label">{tab.label}</span>
             </button>
           ))}
         </nav>
 
         <main className="app-main">
-          {activeTab === 'accounts' && <AccountsTab />}
-          {activeTab === 'income-expense' && <IncomeExpenseTab />}
-          {activeTab === 'net-worth' && <NetWorthTab />}
-          {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          <div
+            key={activeTab}
+            id={`panel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`tab-${activeTab}`}
+            className="results-section"
+          >
+            {activeTab === 'accounts' && <AccountsTab />}
+            {activeTab === 'income-expense' && <IncomeExpenseTab />}
+            {activeTab === 'net-worth' && <NetWorthTab />}
+            {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          </div>
         </main>
       </div>
 
