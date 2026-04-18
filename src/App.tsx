@@ -29,11 +29,15 @@ function App() {
       </header>
 
       <div className="tabs-container">
-        <nav className="tabs-nav" role="tablist" aria-label="Dashboard sections">
+        <nav className="tabs-nav" role="tablist" aria-label="Main navigation" role="tablist" aria-label="Dashboard sections">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               id={`tab-${tab.id}`}
+              id={`${tab.id}-tab`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`${tab.id}-panel`}
               className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
               role="tab"
@@ -56,10 +60,17 @@ function App() {
             aria-labelledby={`tab-${activeTab}`}
             className="results-section"
           >
+            <div
+            id={`${activeTab}-panel`}
+            role="tabpanel"
+            aria-labelledby={`${activeTab}-tab`}
+            tabIndex={0}
+          >
             {activeTab === 'accounts' && <AccountsTab />}
-            {activeTab === 'income-expense' && <IncomeExpenseTab />}
-            {activeTab === 'net-worth' && <NetWorthTab />}
-            {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+              {activeTab === 'income-expense' && <IncomeExpenseTab />}
+              {activeTab === 'net-worth' && <NetWorthTab />}
+              {activeTab === 'spending-trends' && <SpendingTrendsTab />}
+          </div>
           </div>
         </main>
       </div>
