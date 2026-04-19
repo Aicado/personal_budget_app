@@ -14,10 +14,6 @@ export const SpendingTrendsTab: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTrendsData()
-  }, [])
-
   const fetchTrendsData = async () => {
     setLoading(true)
     setError(null)
@@ -41,6 +37,10 @@ export const SpendingTrendsTab: React.FC = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchTrendsData()
+  }, [])
 
   return (
     <div className="spending-trends-tab">
