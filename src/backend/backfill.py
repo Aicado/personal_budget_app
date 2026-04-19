@@ -53,7 +53,7 @@ def get_account_metadata(csv_path: Path, base_dir: Path) -> Dict[str, str]:
     return metadata
 
 
-def backfill_database(accounts_dir: str = "data", transactions_dir: str = "transaction_data") -> Dict[str, Any]:
+def backfill_database(accounts_dir: str = "data", transactions_dir: str = "transaction_data", categorizer=None) -> Dict[str, Any]:
     """Backfill DuckDB with account definitions from accounts_dir and transactions from transactions_dir."""
     db = TransactionDatabase()
     db.clear_tables()
@@ -180,6 +180,7 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "trans
                     db_result = db.insert_transactions(
                         account_df,
                         csv_file.name,
+                        categorizer=categorizer,
                         account_name=account_name,
                         account_type=metadata["account_type"],
                         account_path=metadata["account_path"]

@@ -19,7 +19,7 @@ class TransactionAnalyzer:
             .cast(pl.Utf8)
             .str.replace_all("$", "")
             .str.replace_all(",", "")
-            .str.strip()
+            .str.strip_chars()
         )
 
         return df.with_columns(
@@ -102,21 +102,21 @@ class TransactionAnalyzer:
 
         if "category" in df.columns and "category_group" not in df.columns:
             df = df.with_columns(
-                pl.col("category").str.split("|").arr.get(0).str.strip().alias("category_group"),
-                pl.col("category").str.split("|").arr.get(-1).str.strip().alias("category"),
+                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
         elif "category group/category" in df.columns:
             df = df.with_columns(
-                pl.col("category").str.split("|").arr.get(0).str.strip().alias("category_group"),
-                pl.col("category").str.split("|").arr.get(-1).str.strip().alias("category"),
+                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
 
         df = df.with_columns(
             pl.when(pl.col("inflow") > pl.col("outflow"))
-            .then("income")
+             .then(pl.lit("income"))
             .when(pl.col("outflow") > pl.col("inflow"))
-            .then("expense")
-            .otherwise("transfer")
+             .then(pl.lit("expense"))
+             .otherwise(pl.lit("transfer"))
             .alias("transaction_type"),
             pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
         )
@@ -133,7 +133,7 @@ class TransactionAnalyzer:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
         monthly = (
-            df.groupby("month_str")
+            df.group_by("month_str")
             .agg(
                 [
                     pl.col("amount").sum().round(2).alias("amount"),
@@ -161,7 +161,7 @@ class TransactionAnalyzer:
 
         category_monthly = (
             df.filter(pl.col("outflow") > 0)
-            .groupby(["month_str", "category"])
+            .group_by(["month_str", "category"])
             .agg(pl.col("outflow").sum().alias("outflow"))
             .sort(["month_str", "category"])
         )
@@ -199,7 +199,7 @@ class TransactionAnalyzer:
 
         totals = (
             df.filter(pl.col("outflow") > 0)
-            .groupby("category")
+            .group_by("category")
             .agg(pl.col("outflow").sum().round(2).alias("outflow"))
             .sort("category")
         )
@@ -217,7 +217,7 @@ class TransactionAnalyzer:
         total_inflow = float(df["inflow"].sum() or 0.0)
         total_outflow = float(df["outflow"].sum() or 0.0)
         monthly = (
-            df.groupby("month_str")
+            df.group_by("month_str")
             .agg(
                 [
                     pl.col("inflow").sum().alias("monthly_inflow"),

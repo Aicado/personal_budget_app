@@ -18,6 +18,8 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make test        - Run tests"
+	@echo "  make test-backend - Run only backend tests"
+	@echo "  make test-frontend - Run only frontend tests"
 	@echo "  make lint        - Lint code"
 	@echo "  make format      - Format code"
 	@echo "  make clean       - Clean build artifacts"
@@ -60,10 +62,14 @@ build-backend:
 	uv build
 	@echo "✅ Python package built"
 
-test:
-	@echo "🧪 Running tests..."
-	@echo "No tests configured yet"
+test: test-backend test-frontend
+test-backend:
+	@echo "🧪 Running backend tests..."
+	uv run pytest tests/
 
+test-frontend:
+	@echo "🧪 Running frontend tests..."
+	npm test
 lint:
 	@echo "🔍 Linting code..."
 	npm run lint
