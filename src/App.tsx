@@ -66,7 +66,7 @@ function App() {
       </div>
 
       <footer className="app-footer">
-        <p>💡 Tip: Account and transaction data are loaded automatically from the backend data directory.</p>
+        <p><span aria-hidden="true">💡</span> Tip: Account and transaction data are loaded automatically from the backend data directory.</p>
       </footer>
     </div>
   )
