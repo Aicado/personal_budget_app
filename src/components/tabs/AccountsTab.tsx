@@ -35,10 +35,6 @@ export const AccountsTab: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchAccounts()
-  }, [])
-
   const fetchAccounts = async () => {
     setLoading(true)
     setError(null)
@@ -55,6 +51,10 @@ export const AccountsTab: React.FC = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [])
 
   const toggleAccountExpansion = async (accountName: string) => {
     const newExpanded = new Set(expandedAccounts)
@@ -182,6 +182,8 @@ export const AccountsTab: React.FC = () => {
                         <button
                           className="btn btn-secondary expand-btn"
                           onClick={() => toggleAccountExpansion(account.name)}
+                          aria-expanded={expandedAccounts.has(account.name)}
+                          aria-controls={`transactions-${account.name.replace(/\s+/g, '-').toLowerCase()}`}
                         >
                           {expandedAccounts.has(account.name) ? 'Collapse' : 'Expand'} Transactions
                         </button>
@@ -215,7 +217,7 @@ export const AccountsTab: React.FC = () => {
                     )}
                   </div>
                   {expandedAccounts.has(account.name) && accountTransactions[account.name] && (
-                    <div className="account-transactions">
+                    <div className="account-transactions" id={`transactions-${account.name.replace(/\s+/g, '-').toLowerCase()}`}>
                       <h4>Recent Transactions</h4>
                       <div className="transactions-table-container">
                         <table className="transactions-table">

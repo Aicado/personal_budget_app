@@ -11,10 +11,6 @@ export const IncomeExpenseTab: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchCategoryData()
-  }, [])
-
   const fetchCategoryData = async () => {
     setLoading(true)
     setError(null)
@@ -32,6 +28,10 @@ export const IncomeExpenseTab: React.FC = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchCategoryData()
+  }, [])
 
   const totalIncome = Object.values(categoryData).reduce((sum, val) => {
     return sum + (val > 0 ? val : 0)

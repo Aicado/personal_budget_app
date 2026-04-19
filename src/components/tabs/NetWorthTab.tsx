@@ -20,10 +20,6 @@ export const NetWorthTab: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchCurrentBalances()
-  }, [])
-
   const fetchCurrentBalances = async () => {
     setLoading(true)
     setError(null)
@@ -33,7 +29,7 @@ export const NetWorthTab: React.FC = () => {
         throw new Error('Failed to fetch current account balances')
       }
       const data = await response.json()
-      const normalizedAccounts = (data.accounts || []).map((account: any) => ({
+      const normalizedAccounts = (data.accounts || []).map((account: { name?: string; type?: string; is_asset?: boolean; net_value?: number; balance?: number }) => ({
         name: account.name || 'Unknown',
         type: account.type || 'Unknown',
         is_asset: account.is_asset ?? (account.type ? account.type.toLowerCase().indexOf('credit') === -1 && account.type.toLowerCase().indexOf('debt') === -1 : true),
@@ -51,6 +47,10 @@ export const NetWorthTab: React.FC = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchCurrentBalances()
+  }, [])
 
   return (
     <div className="net-worth-tab">
