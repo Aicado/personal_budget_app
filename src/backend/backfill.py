@@ -1,6 +1,5 @@
 """Backfill script to populate DuckDB with existing Personal Budget App CSV data."""
 
-import os
 from pathlib import Path
 import polars as pl
 from typing import List, Dict, Any
@@ -63,7 +62,7 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "trans
     balance_files = find_current_balance_files(accounts_dir)
     
     # Load transactions from transactions_dir
-    transactions_path = Path(transactions_dir)
+    Path(transactions_dir)
     transaction_files = find_transaction_files(transactions_dir)
     
     if not transaction_files and not balance_files:
@@ -177,7 +176,7 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "trans
                 account_df = df_filtered.filter(pl.col("account") == account_name)
                 metadata = account_map.get(account_name)
                 if metadata:
-                    db_result = db.insert_transactions(
+                    db.insert_transactions(
                         account_df,
                         csv_file.name,
                         account_name=account_name,
@@ -212,7 +211,6 @@ def backfill_database(accounts_dir: str = "data", transactions_dir: str = "trans
 
 
 if __name__ == "__main__":
-    import json
     
     # Run backfill
     result = backfill_database()
