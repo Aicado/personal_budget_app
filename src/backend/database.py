@@ -75,7 +75,7 @@ class TransactionDatabase:
             self.conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_file_hash ON transactions(file_hash)
             """)
-        except:
+        except Exception:
             pass  # Index already exists
         
         # Create index on date for range queries
@@ -83,7 +83,7 @@ class TransactionDatabase:
             self.conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_date ON transactions(date)
             """)
-        except:
+        except Exception:
             pass  # Index already exists
 
     def clear_tables(self):
@@ -239,88 +239,55 @@ class TransactionDatabase:
 
     def get_account_load_status(self) -> List[Dict[str, Any]]:
         """Get load status for each account, including latest transaction date and current balance availability."""
-        account_rows = self.conn.execute("""
-            SELECT account_name, account_type, account_path, current_debit, current_credit, net_value, updated_at
-            FROM accounts
+        # Use a single efficient SQL query to join accounts and transaction aggregates.
+        # Joining on (name, type, path) to ensure correctness as accounts might share paths (like empty strings).
+        rows = self.conn.execute("""
+            SELECT
+                COALESCE(a.account_name, t.account, 'Unknown') as name,
+                COALESCE(a.account_type, t.account_type, 'Unknown') as type,
+                COALESCE(a.account_path, t.account_path, '') as path,
+                CAST(COALESCE(t.transaction_count, 0) AS INTEGER) as transaction_count,
+                t.first_transaction_date,
+                t.last_transaction_date,
+                COALESCE(a.current_debit, 0.0) as current_debit,
+                COALESCE(a.current_credit, 0.0) as current_credit,
+                COALESCE(a.net_value, 0.0) as net_value,
+                a.updated_at as current_balance_updated_at,
+                (a.account_path IS NOT NULL AND a.account_name IS NOT NULL) as current_balance_present
+            FROM accounts a
+            FULL OUTER JOIN (
+                SELECT
+                    account, account_type, account_path,
+                    COUNT(*) as transaction_count,
+                    MIN(date) as first_transaction_date,
+                    MAX(date) as last_transaction_date
+                FROM transactions
+                GROUP BY account, account_type, account_path
+            ) t ON
+                COALESCE(a.account_name, '') = COALESCE(t.account, '') AND
+                COALESCE(a.account_type, '') = COALESCE(t.account_type, '') AND
+                COALESCE(a.account_path, '') = COALESCE(t.account_path, '')
+            ORDER BY LOWER(name), LOWER(type), LOWER(path)
         """).fetchall()
 
-        account_info = {}
-        for row in account_rows:
-            key = (row[0] or '', row[1] or '', row[2] or '')
-            account_info[key] = {
+        return [
+            {
                 "name": row[0],
                 "type": row[1],
                 "path": row[2],
-                "current_debit": float(row[3] or 0.0),
-                "current_credit": float(row[4] or 0.0),
-                "net_value": float(row[5] or 0.0),
-                "current_balance_updated_at": str(row[6]) if row[6] else None,
-                "current_balance_present": True,
-                "transaction_count": 0,
-                "first_transaction_date": None,
-                "last_transaction_date": None
-            }
-
-        transaction_rows = self.conn.execute("""
-            SELECT account, account_type, account_path, COUNT(*) as transaction_count, MIN(date) as first_transaction_date, MAX(date) as last_transaction_date
-            FROM transactions
-            GROUP BY account, account_type, account_path
-        """).fetchall()
-
-        results = []
-        seen_keys = set()
-
-        for row in transaction_rows:
-            key = (row[0] or '', row[1] or '', row[2] or '')
-            seen_keys.add(key)
-            account = account_info.get(key, {
-                "name": row[0] or 'Unknown',
-                "type": row[1] or 'Unknown',
-                "path": row[2] or '',
-                "current_debit": 0.0,
-                "current_credit": 0.0,
-                "net_value": 0.0,
-                "current_balance_updated_at": None,
-                "current_balance_present": False
-            })
-
-            merged = {
-                "name": account["name"],
-                "type": account["type"],
-                "path": account["path"],
-                "transaction_count": int(row[3] or 0),
+                "transaction_count": row[3],
                 "first_transaction_date": str(row[4]) if row[4] else None,
                 "last_transaction_date": str(row[5]) if row[5] else None,
-                "current_balance_present": account["current_balance_present"],
-                "current_balance_updated_at": account["current_balance_updated_at"],
-                "current_debit": account["current_debit"],
-                "current_credit": account["current_credit"],
-                "net_value": account["net_value"],
-                "needs_current_balance": not account["current_balance_present"],
-                "needs_transactions": int(row[3] or 0) == 0
+                "current_debit": float(row[6]),
+                "current_credit": float(row[7]),
+                "net_value": float(row[8]),
+                "current_balance_updated_at": str(row[9]) if row[9] else None,
+                "current_balance_present": bool(row[10]),
+                "needs_current_balance": not bool(row[10]),
+                "needs_transactions": row[3] == 0
             }
-            results.append(merged)
-
-        for key, account in account_info.items():
-            if key in seen_keys:
-                continue
-            results.append({
-                "name": account["name"],
-                "type": account["type"],
-                "path": account["path"],
-                "transaction_count": 0,
-                "first_transaction_date": None,
-                "last_transaction_date": None,
-                "current_balance_present": True,
-                "current_balance_updated_at": account["current_balance_updated_at"],
-                "current_debit": account["current_debit"],
-                "current_credit": account["current_credit"],
-                "net_value": account["net_value"],
-                "needs_current_balance": False,
-                "needs_transactions": True
-            })
-
-        return sorted(results, key=lambda a: (a["name"].lower(), a["type"].lower(), a["path"]))
+            for row in rows
+        ]
 
     def file_exists(self, df: pl.DataFrame) -> bool:
         """Check if this file's data already exists in the database."""
@@ -345,7 +312,7 @@ class TransactionDatabase:
             
             return {
                 "status": "duplicate",
-                "message": f"File data already exists in database",
+                "message": "File data already exists in database",
                 "existing_records": existing[0][0],
                 "date_range": {
                     "start": str(existing[0][1]),
@@ -367,43 +334,50 @@ class TransactionDatabase:
             df = df.with_columns(pl.lit("Uncategorized").alias("category"))
         if "category_group" not in df.columns:
             df = df.with_columns(
-                pl.col("category").cast(pl.Utf8).str.split("/").arr.get(0).str.strip().alias("category_group")
+                pl.col("category").cast(pl.Utf8).str.split("/").list.get(0).str.strip_chars().alias("category_group")
             )
         if "transaction_type" not in df.columns:
             df = df.with_columns(
                 pl.when(pl.col("inflow") > pl.col("outflow"))
-                .then("income")
+                .then(pl.lit("income"))
                 .when(pl.col("outflow") > pl.col("inflow"))
-                .then("expense")
-                .otherwise("transfer")
+                .then(pl.lit("expense"))
+                .otherwise(pl.lit("transfer"))
                 .alias("transaction_type")
             )
 
-        categories = df.select(["category", "category_group"]).unique().to_dicts()
+        categories = df.select([
+            pl.col("category").alias("category_name"),
+            pl.col("category_group")
+        ]).unique().to_dicts()
         self.register_categories(categories)
 
-        # Prepare data for insertion
-        records = []
-        for _, row in df.iterrows():
-            records.append({
-                "file_hash": file_hash,
-                "account": row.get("account", "Unknown"),
-                "account_type": row.get("account_type", "Unknown"),
-                "account_path": row.get("account_path", ""),
-                "date": row.get("date"),
-                "payee": row.get("payee", ""),
-                "category": row.get("category", "Uncategorized"),
-                "category_group": row.get("category_group", "Uncategorized"),
-                "description": row.get("description", ""),
-                "outflow": float(row.get("outflow", 0)),
-                "inflow": float(row.get("inflow", 0)),
-                "amount": float(row.get("amount", 0)),
-                "transaction_type": row.get("transaction_type", "transfer"),
-                "month_year": row.get("month_str", ""),
-                "file_source": filename
-            })
+        # Prepare data for insertion using vectorized operations
+        # month_year comes from month_str in the input dataframe
+        cols_to_select = [
+            "file_hash",
+            pl.col("account").fill_null("Unknown") if "account" in df.columns else pl.lit("Unknown").alias("account"),
+            pl.col("account_type").fill_null("Unknown") if "account_type" in df.columns else pl.lit("Unknown").alias("account_type"),
+            pl.col("account_path").fill_null("") if "account_path" in df.columns else pl.lit("").alias("account_path"),
+            "date",
+            pl.col("payee").fill_null("") if "payee" in df.columns else pl.lit("").alias("payee"),
+            pl.col("category").fill_null("Uncategorized") if "category" in df.columns else pl.lit("Uncategorized").alias("category"),
+            pl.col("category_group").fill_null("Uncategorized") if "category_group" in df.columns else pl.lit("Uncategorized").alias("category_group"),
+            pl.col("description").fill_null("") if "description" in df.columns else pl.lit("").alias("description"),
+            pl.col("outflow").cast(pl.Float64).fill_null(0.0) if "outflow" in df.columns else pl.lit(0.0).alias("outflow"),
+            pl.col("inflow").cast(pl.Float64).fill_null(0.0) if "inflow" in df.columns else pl.lit(0.0).alias("inflow"),
+            pl.col("amount").cast(pl.Float64).fill_null(0.0) if "amount" in df.columns else pl.lit(0.0).alias("amount"),
+            "transaction_type",
+            "month_year",
+            "file_source"
+        ]
+
+        insert_df = df.with_columns([
+            pl.lit(file_hash).alias("file_hash"),
+            pl.lit(filename).alias("file_source"),
+            pl.col("month_str").alias("month_year") if "month_str" in df.columns else pl.lit("").alias("month_year"),
+        ]).select(cols_to_select)
         
-        insert_df = pl.DataFrame(records)
         self.conn.register("temp_insert", insert_df.to_arrow())
         self.conn.execute("""
             INSERT INTO transactions 
@@ -416,8 +390,8 @@ class TransactionDatabase:
         
         return {
             "status": "inserted",
-            "message": f"Successfully inserted {len(records)} transactions",
-            "records_count": len(records),
+            "message": f"Successfully inserted {insert_df.height} transactions",
+            "records_count": insert_df.height,
             "file_hash": file_hash,
             "filename": filename
         }
