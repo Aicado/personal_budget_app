@@ -55,10 +55,17 @@ export const NetWorthTab: React.FC = () => {
   return (
     <div className="net-worth-tab">
       <div className="tab-header">
-        <h2>📊 Net Worth Report</h2>
+        <h2><span aria-hidden="true">📊</span> Net Worth Report</h2>
         <p>Current account balances and net worth</p>
         <button className="btn btn-primary" onClick={fetchCurrentBalances} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh Balances'}
+          {loading ? (
+            <>
+              <span className="spinner" aria-hidden="true"></span>
+              Loading...
+            </>
+          ) : (
+            'Refresh Balances'
+          )}
         </button>
       </div>
 
