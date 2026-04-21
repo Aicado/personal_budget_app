@@ -166,88 +166,61 @@ class TransactionDatabase:
         ]
 
     def get_account_load_status(self) -> List[Dict[str, Any]]:
-        """Check status of all accounts (which have transactions vs balance snapshots)."""
-        # Get accounts from snapshots
-        account_rows = self.conn.execute("""
-            SELECT account_name, account_type, account_path, current_debit, current_credit, net_value, updated_at
-            FROM accounts
-        """).fetchall()
+        """Check status of all accounts using a single SQL JOIN for performance."""
+        # Use a FULL OUTER JOIN to combine transaction data and account snapshots in one go.
+        # This replaces multiple queries and manual Python-level dictionary merging.
+        query = """
+            WITH tx_summary AS (
+                SELECT
+                    account,
+                    account_type,
+                    account_path,
+                    COUNT(*) as tx_count,
+                    MIN(date) as first_tx,
+                    MAX(date) as last_tx
+                FROM transactions
+                GROUP BY account, account_type, account_path
+            )
+            SELECT
+                COALESCE(t.account, a.account_name) as name,
+                COALESCE(t.account_type, a.account_type) as type,
+                COALESCE(t.account_path, a.account_path) as path,
+                COALESCE(t.tx_count, 0) as transaction_count,
+                t.first_tx as first_transaction_date,
+                t.last_tx as last_transaction_date,
+                (a.account_path IS NOT NULL) as current_balance_present,
+                a.updated_at as current_balance_updated_at,
+                COALESCE(a.current_debit, 0.0) as current_debit,
+                COALESCE(a.current_credit, 0.0) as current_credit,
+                COALESCE(a.net_value, 0.0) as net_value
+            FROM tx_summary t
+            FULL OUTER JOIN accounts a ON
+                t.account IS NOT DISTINCT FROM a.account_name AND
+                t.account_type IS NOT DISTINCT FROM a.account_type AND
+                t.account_path IS NOT DISTINCT FROM a.account_path
+            ORDER BY LOWER(name), LOWER(type), path
+        """
 
-        account_info = {
-            f"{row[0]}-{row[1]}-{row[2]}": {
+        rows = self.conn.execute(query).fetchall()
+
+        return [
+            {
                 "name": row[0],
                 "type": row[1],
                 "path": row[2],
-                "current_debit": row[3],
-                "current_credit": row[4],
-                "net_value": row[5],
-                "current_balance_updated_at": str(row[6]),
-                "current_balance_present": True
-            }
-            for row in account_rows
-        }
-
-        # Get accounts from transactions
-        transaction_accounts = self.conn.execute("""
-            SELECT account, account_type, account_path, COUNT(*), MIN(date), MAX(date)
-            FROM transactions
-            GROUP BY account, account_type, account_path
-        """).fetchall()
-
-        results = []
-        seen_keys = set()
-
-        for row in transaction_accounts:
-            key = f"{row[0]}-{row[1]}-{row[2]}"
-            seen_keys.add(key)
-            account = account_info.get(key, {
-                "name": row[0],
-                "type": row[1],
-                "path": row[2],
-                "current_debit": 0.0,
-                "current_credit": 0.0,
-                "net_value": 0.0,
-                "current_balance_updated_at": None,
-                "current_balance_present": False
-            })
-
-            merged = {
-                "name": account["name"],
-                "type": account["type"],
-                "path": account["path"],
-                "transaction_count": int(row[3] or 0),
+                "transaction_count": int(row[3]),
                 "first_transaction_date": str(row[4]) if row[4] else None,
                 "last_transaction_date": str(row[5]) if row[5] else None,
-                "current_balance_present": account["current_balance_present"],
-                "current_balance_updated_at": account["current_balance_updated_at"],
-                "current_debit": account["current_debit"],
-                "current_credit": account["current_credit"],
-                "net_value": account["net_value"],
-                "needs_current_balance": not account["current_balance_present"],
-                "needs_transactions": int(row[3] or 0) == 0
+                "current_balance_present": bool(row[6]),
+                "current_balance_updated_at": str(row[7]) if row[7] else None,
+                "current_debit": row[8],
+                "current_credit": row[9],
+                "net_value": row[10],
+                "needs_current_balance": not bool(row[6]),
+                "needs_transactions": int(row[3]) == 0
             }
-            results.append(merged)
-
-        for key, account in account_info.items():
-            if key in seen_keys:
-                continue
-            results.append({
-                "name": account["name"],
-                "type": account["type"],
-                "path": account["path"],
-                "transaction_count": 0,
-                "first_transaction_date": None,
-                "last_transaction_date": None,
-                "current_balance_present": True,
-                "current_balance_updated_at": account["current_balance_updated_at"],
-                "current_debit": account["current_debit"],
-                "current_credit": account["current_credit"],
-                "net_value": account["net_value"],
-                "needs_current_balance": False,
-                "needs_transactions": True
-            })
-
-        return sorted(results, key=lambda a: (a["name"].lower(), a["type"].lower(), a["path"]))
+            for row in rows
+        ]
 
     def file_exists(self, df: pl.DataFrame) -> bool:
         """Check if this file's data already exists in the database."""
