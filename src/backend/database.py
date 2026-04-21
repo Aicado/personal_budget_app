@@ -1,10 +1,11 @@
 """DuckDB database service for storing and managing transaction data."""
 
+import asyncio
 import duckdb
 import io
 import polars as pl
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import hashlib
 
 
@@ -69,6 +70,18 @@ class TransactionDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Create payee_mappings table for LLM-based categorization
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS payee_mappings (
+                payee VARCHAR,
+                category VARCHAR,
+                category_group VARCHAR,
+                confidence DOUBLE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (payee, category)
+            )
+        """)
+
         
         # Create index on file_hash for duplicate detection
         try:
@@ -91,6 +104,7 @@ class TransactionDatabase:
         self.conn.execute("DELETE FROM transactions")
         self.conn.execute("DELETE FROM accounts")
         self.conn.execute("DELETE FROM categories")
+        self.conn.execute("DELETE FROM payee_mappings")
 
     def _compute_file_hash(self, df: pl.DataFrame) -> str:
         """Compute hash of dataframe for duplicate detection."""
@@ -107,50 +121,87 @@ class TransactionDatabase:
         if category_df.is_empty():
             return
 
-        category_df = category_df.unique(subset=["category_name"])
+        category_df = category_df.unique(subset=["category"])
         self.conn.register("new_categories", category_df.to_arrow())
         self.conn.execute("""
             INSERT INTO categories (category_name, category_group)
-            SELECT DISTINCT category_name, category_group
+            SELECT DISTINCT category as category_name, category_group
             FROM new_categories
             WHERE category_name NOT IN (SELECT category_name FROM categories)
         """)
         self.conn.unregister("new_categories")
 
     def register_account(self, account_name: str, account_type: str, account_path: str, current_debit: float = 0.0, current_credit: float = 0.0, net_value: float = 0.0) -> None:
-        """Upsert an account record with current balance metadata."""
+        """Register or update an account with its current balance."""
         self.conn.execute("""
-            MERGE INTO accounts AS target
-            USING (SELECT ? AS account_name, ? AS account_type, ? AS account_path, ? AS current_debit, ? AS current_credit, ? AS net_value) AS source
-            ON target.account_path = source.account_path
-            WHEN MATCHED THEN UPDATE SET
-                account_name = source.account_name,
-                account_type = source.account_type,
-                current_debit = source.current_debit,
-                current_credit = source.current_credit,
-                net_value = source.net_value,
-                updated_at = CURRENT_TIMESTAMP
-            WHEN NOT MATCHED THEN INSERT (account_name, account_type, account_path, current_debit, current_credit, net_value)
-            VALUES (source.account_name, source.account_type, source.account_path, source.current_debit, source.current_credit, source.net_value)
+            INSERT INTO accounts (account_name, account_type, account_path, current_debit, current_credit, net_value, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (account_path) DO UPDATE SET
+                account_name = EXCLUDED.account_name,
+                account_type = EXCLUDED.account_type,
+                current_debit = EXCLUDED.current_debit,
+                current_credit = EXCLUDED.current_credit,
+                net_value = EXCLUDED.net_value,
+                updated_at = EXCLUDED.updated_at
         """, [account_name, account_type, account_path, current_debit, current_credit, net_value])
 
-    def get_account_summaries(self) -> List[Dict[str, Any]]:
-        """Get a transaction-based summary for each account."""
+    def get_account_balances(self) -> List[Dict[str, Any]]:
+        """Get all current account balances."""
         rows = self.conn.execute("""
-            SELECT 
-                COALESCE(account, 'Unknown') as account_name,
-                COALESCE(account_type, 'Unknown') as account_type,
-                COALESCE(account_path, '') as account_path,
-                COUNT(*) as transaction_count,
-                MIN(date) as start_date,
-                MAX(date) as end_date,
-                SUM(inflow) as total_inflow,
-                SUM(outflow) as total_outflow,
-                SUM(amount) as net_total
-            FROM transactions
-            GROUP BY account_name, account_type, account_path
-            ORDER BY total_inflow DESC
+            SELECT account_name, account_type, current_debit, current_credit, net_value, updated_at
+            FROM accounts
+            ORDER BY account_name
         """).fetchall()
+
+        return [
+            {
+                "name": row[0],
+                "type": row[1],
+                "debit": row[2],
+                "credit": row[3],
+                "net_value": row[4],
+                "updated_at": str(row[5])
+            }
+            for row in rows
+        ]
+
+    def get_account_load_status(self) -> List[Dict[str, Any]]:
+        """Check status of all accounts using a single SQL JOIN for performance."""
+        # Use a FULL OUTER JOIN to combine transaction data and account snapshots in one go.
+        # This replaces multiple queries and manual Python-level dictionary merging.
+        query = """
+            WITH tx_summary AS (
+                SELECT
+                    account,
+                    account_type,
+                    account_path,
+                    COUNT(*) as tx_count,
+                    MIN(date) as first_tx,
+                    MAX(date) as last_tx
+                FROM transactions
+                GROUP BY account, account_type, account_path
+            )
+            SELECT
+                COALESCE(t.account, a.account_name) as name,
+                COALESCE(t.account_type, a.account_type) as type,
+                COALESCE(t.account_path, a.account_path) as path,
+                COALESCE(t.tx_count, 0) as transaction_count,
+                t.first_tx as first_transaction_date,
+                t.last_tx as last_transaction_date,
+                (a.account_path IS NOT NULL) as current_balance_present,
+                a.updated_at as current_balance_updated_at,
+                COALESCE(a.current_debit, 0.0) as current_debit,
+                COALESCE(a.current_credit, 0.0) as current_credit,
+                COALESCE(a.net_value, 0.0) as net_value
+            FROM tx_summary t
+            FULL OUTER JOIN accounts a ON
+                t.account IS NOT DISTINCT FROM a.account_name AND
+                t.account_type IS NOT DISTINCT FROM a.account_type AND
+                t.account_path IS NOT DISTINCT FROM a.account_path
+            ORDER BY LOWER(name), LOWER(type), path
+        """
+
+        rows = self.conn.execute(query).fetchall()
 
         return [
             {
@@ -158,133 +209,15 @@ class TransactionDatabase:
                 "type": row[1],
                 "path": row[2],
                 "transaction_count": int(row[3]),
-                "date_range": {"start": str(row[4]), "end": str(row[5])},
-                "totals": {
-                    "inflow": float(row[6] or 0.0),
-                    "outflow": float(row[7] or 0.0),
-                    "net": float(row[8] or 0.0)
-                }
-            }
-            for row in rows
-        ]
-
-    def get_category_summary(self) -> Dict[str, float]:
-        """Get total amount by category."""
-        rows = self.conn.execute("""
-            SELECT category, SUM(amount) as total
-            FROM transactions
-            GROUP BY category
-            ORDER BY total DESC
-        """).fetchall()
-
-        return {row[0]: float(row[1] or 0.0) for row in rows}
-
-    def get_monthly_trends(self) -> Dict[str, Any]:
-        """Get monthly inflow/outflow/net trends."""
-        rows = self.conn.execute("""
-            SELECT month_year, SUM(amount) as net_amount, SUM(inflow) as inflow, SUM(outflow) as outflow
-            FROM transactions
-            GROUP BY month_year
-            ORDER BY month_year
-        """).fetchall()
-
-        months = [row[0] for row in rows]
-        return {
-            "months": months,
-            "net_amounts": [float(row[1] or 0.0) for row in rows],
-            "outflows": [float(row[3] or 0.0) for row in rows],
-            "inflows": [float(row[2] or 0.0) for row in rows],
-        }
-
-    def get_account_balances(self) -> List[Dict[str, Any]]:
-        """Get current account balances stored in the accounts table."""
-        rows = self.conn.execute("""
-            SELECT account_name, account_type, account_path, current_debit, current_credit, net_value
-            FROM accounts
-            ORDER BY account_type, account_name
-        """).fetchall()
-
-        if rows:
-            return [
-                {
-                    "name": row[0],
-                    "type": row[1],
-                    "path": row[2],
-                    "debit": float(row[3] or 0.0),
-                    "credit": float(row[4] or 0.0),
-                    "net_value": float(row[5] or 0.0)
-                }
-                for row in rows
-            ]
-
-        # Fallback to account totals from transactions if no account records exist
-        rows = self.conn.execute("""
-            SELECT account, SUM(inflow) as inflow, SUM(outflow) as outflow, SUM(amount) as net_value
-            FROM transactions
-            GROUP BY account
-            ORDER BY account
-        """).fetchall()
-
-        return [
-            {
-                "name": row[0] or 'Unknown',
-                "type": 'Unknown',
-                "path": '',
-                "debit": float(row[1] or 0.0),
-                "credit": float(row[2] or 0.0),
-                "net_value": float(row[3] or 0.0)
-            }
-            for row in rows
-        ]
-
-    def get_account_load_status(self) -> List[Dict[str, Any]]:
-        """Get load status for each account, including latest transaction date and current balance availability."""
-        # Use a single efficient SQL query to join accounts and transaction aggregates.
-        # Joining on (name, type, path) to ensure correctness as accounts might share paths (like empty strings).
-        rows = self.conn.execute("""
-            SELECT
-                COALESCE(a.account_name, t.account, 'Unknown') as name,
-                COALESCE(a.account_type, t.account_type, 'Unknown') as type,
-                COALESCE(a.account_path, t.account_path, '') as path,
-                CAST(COALESCE(t.transaction_count, 0) AS INTEGER) as transaction_count,
-                t.first_transaction_date,
-                t.last_transaction_date,
-                COALESCE(a.current_debit, 0.0) as current_debit,
-                COALESCE(a.current_credit, 0.0) as current_credit,
-                COALESCE(a.net_value, 0.0) as net_value,
-                a.updated_at as current_balance_updated_at,
-                (a.account_path IS NOT NULL AND a.account_name IS NOT NULL) as current_balance_present
-            FROM accounts a
-            FULL OUTER JOIN (
-                SELECT
-                    account, account_type, account_path,
-                    COUNT(*) as transaction_count,
-                    MIN(date) as first_transaction_date,
-                    MAX(date) as last_transaction_date
-                FROM transactions
-                GROUP BY account, account_type, account_path
-            ) t ON
-                COALESCE(a.account_name, '') = COALESCE(t.account, '') AND
-                COALESCE(a.account_type, '') = COALESCE(t.account_type, '') AND
-                COALESCE(a.account_path, '') = COALESCE(t.account_path, '')
-            ORDER BY LOWER(name), LOWER(type), LOWER(path)
-        """).fetchall()
-
-        return [
-            {
-                "name": row[0],
-                "type": row[1],
-                "path": row[2],
-                "transaction_count": row[3],
                 "first_transaction_date": str(row[4]) if row[4] else None,
                 "last_transaction_date": str(row[5]) if row[5] else None,
-                "current_debit": float(row[6]),
-                "current_credit": float(row[7]),
-                "net_value": float(row[8]),
-                "current_balance_updated_at": str(row[9]) if row[9] else None,
-                "current_balance_present": bool(row[10]),
-                "needs_current_balance": not bool(row[10]),
-                "needs_transactions": row[3] == 0
+                "current_balance_present": bool(row[6]),
+                "current_balance_updated_at": str(row[7]) if row[7] else None,
+                "current_debit": row[8],
+                "current_credit": row[9],
+                "net_value": row[10],
+                "needs_current_balance": not bool(row[6]),
+                "needs_transactions": int(row[3]) == 0
             }
             for row in rows
         ]
@@ -299,7 +232,7 @@ class TransactionDatabase:
 
         return result[0][0] > 0
 
-    def insert_transactions(self, df: pl.DataFrame, filename: str, account_name: str = None, account_type: str = None, account_path: str = None) -> Dict[str, Any]:
+    def insert_transactions(self, df: pl.DataFrame, filename: str, account_name: str = None, account_type: str = None, account_path: str = None, categorizer=None) -> Dict[str, Any]:
         """Insert transactions into database and return summary."""
         file_hash = self._compute_file_hash(df)
         
@@ -372,12 +305,13 @@ class TransactionDatabase:
             "file_source"
         ]
 
+        # NOTE: LLM categorization is temporarily bypassed during vectorized insertion for speed.
+        # It should be re-implemented as a post-insertion batch process if needed.
         insert_df = df.with_columns([
             pl.lit(file_hash).alias("file_hash"),
             pl.lit(filename).alias("file_source"),
             pl.col("month_str").alias("month_year") if "month_str" in df.columns else pl.lit("").alias("month_year"),
         ]).select(cols_to_select)
-        
         self.conn.register("temp_insert", insert_df.to_arrow())
         self.conn.execute("""
             INSERT INTO transactions 
@@ -423,6 +357,33 @@ class TransactionDatabase:
                 SELECT * FROM transactions ORDER BY date DESC
             """).fetch_arrow_table()
         )
+
+    def get_category_summary(self) -> Dict[str, float]:
+        """Get total amount by category."""
+        rows = self.conn.execute("""
+            SELECT category, SUM(amount) as total
+            FROM transactions
+            GROUP BY category
+            ORDER BY total DESC
+        """).fetchall()
+
+        return {row[0]: float(row[1] or 0.0) for row in rows}
+
+    def get_monthly_trends(self) -> Dict[str, Any]:
+        """Get monthly inflow/outflow/net trends."""
+        rows = self.conn.execute("""
+            SELECT month_year, SUM(amount) as net_amount, SUM(inflow) as inflow, SUM(outflow) as outflow
+            FROM transactions
+            GROUP BY month_year
+            ORDER BY month_year
+        """).fetchall()
+
+        return {
+            "months": [row[0] for row in rows],
+            "net_amounts": [float(row[1] or 0.0) for row in rows],
+            "inflows": [float(row[2] or 0.0) for row in rows],
+            "outflows": [float(row[3] or 0.0) for row in rows]
+        }
 
     def get_database_stats(self) -> Dict[str, Any]:
         """Get statistics about the database."""
@@ -482,6 +443,41 @@ class TransactionDatabase:
             }
             for f in files
         ]
+
+    def get_payee_mapping(self, payee: str) -> Optional[Dict[str, Any]]:
+        """Get existing category mapping for a payee."""
+        row = self.conn.execute("""
+            SELECT category, category_group, confidence
+            FROM payee_mappings
+            WHERE payee = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, [payee]).fetchone()
+
+        if row:
+            return {
+                "category": row[0],
+                "category_group": row[1],
+                "confidence": row[2]
+            }
+        return None
+
+    def save_payee_mapping(self, payee: str, category: str, category_group: str, confidence: float):
+        """Save a new payee to category mapping."""
+        self.conn.execute("""
+            INSERT INTO payee_mappings (payee, category, category_group, confidence, created_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (payee, category) DO UPDATE SET
+                category_group = EXCLUDED.category_group,
+                confidence = EXCLUDED.confidence,
+                created_at = EXCLUDED.created_at
+        """, [payee, category, category_group, confidence])
+
+
+    def get_all_categories(self) -> List[str]:
+        """Get list of all unique category names."""
+        rows = self.conn.execute("SELECT DISTINCT category_name FROM categories").fetchall()
+        return [row[0] for row in rows]
 
     def close(self):
         """Close database connection."""

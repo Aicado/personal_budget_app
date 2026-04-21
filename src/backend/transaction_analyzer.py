@@ -19,12 +19,12 @@ class TransactionAnalyzer:
             .cast(pl.Utf8)
             .str.replace_all("$", "")
             .str.replace_all(",", "")
-            .str.strip()
+            .str.strip_chars()
         )
 
         return df.with_columns(
             pl.when(cleaned == "")
-            .then(pl.lit(0.0))
+            .then(0.0)
             .otherwise(cleaned.cast(pl.Float64))
             .alias(column)
         )
@@ -69,10 +69,8 @@ class TransactionAnalyzer:
             df = self._clean_amount_column(df, "debit")
             df = self._clean_amount_column(df, "credit")
             df = df.with_columns(
-                [
-                    pl.col("debit").alias("outflow"),
-                    pl.col("credit").alias("inflow"),
-                ]
+                pl.col("debit").alias("outflow"),
+                pl.col("credit").alias("inflow"),
             )
         else:
             df = df.with_columns(
@@ -104,25 +102,21 @@ class TransactionAnalyzer:
 
         if "category" in df.columns and "category_group" not in df.columns:
             df = df.with_columns(
-                [
-                    pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
-                    pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-                ]
+                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
         elif "category group/category" in df.columns:
             df = df.with_columns(
-                [
-                    pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
-                    pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-                ]
+                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
 
         df = df.with_columns(
             pl.when(pl.col("inflow") > pl.col("outflow"))
-            .then("income")
+             .then(pl.lit("income"))
             .when(pl.col("outflow") > pl.col("inflow"))
-            .then("expense")
-            .otherwise("transfer")
+             .then(pl.lit("expense"))
+             .otherwise(pl.lit("transfer"))
             .alias("transaction_type"),
             pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
         )
