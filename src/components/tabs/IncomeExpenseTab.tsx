@@ -44,10 +44,17 @@ export const IncomeExpenseTab: React.FC = () => {
   return (
     <div className="income-expense-tab">
       <div className="tab-header">
-        <h2>💰 Income & Expense Report</h2>
+        <h2><span aria-hidden="true">💰</span> Income & Expense Report</h2>
         <p>Breakdown of income and expenses by category</p>
         <button className="btn btn-primary" onClick={fetchCategoryData} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh Report'}
+          {loading ? (
+            <>
+              <span className="spinner" aria-hidden="true"></span>
+              Loading...
+            </>
+          ) : (
+            'Refresh Report'
+          )}
         </button>
       </div>
 

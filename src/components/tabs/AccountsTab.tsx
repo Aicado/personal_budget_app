@@ -91,11 +91,18 @@ export const AccountsTab: React.FC = () => {
   return (
     <div className="accounts-tab">
       <div className="tab-header">
-        <h2>💳 Accounts</h2>
+        <h2><span aria-hidden="true">💳</span> Accounts</h2>
         <p>View all accounts and their transaction summary</p>
         <div className="accounts-header-actions">
           <button className="btn btn-primary" onClick={fetchAccounts} disabled={loading}>
-            {loading ? 'Loading...' : 'Refresh Accounts'}
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true"></span>
+                Loading...
+              </>
+            ) : (
+              'Refresh Accounts'
+            )}
           </button>
           <div className="accounts-filter">
             <button

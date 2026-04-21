@@ -45,10 +45,17 @@ export const SpendingTrendsTab: React.FC = () => {
   return (
     <div className="spending-trends-tab">
       <div className="tab-header">
-        <h2>📈 Spending Trends</h2>
+        <h2><span aria-hidden="true">📈</span> Spending Trends</h2>
         <p>Analyze your income and spending patterns over time</p>
         <button className="btn btn-primary" onClick={fetchTrendsData} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh Trends'}
+          {loading ? (
+            <>
+              <span className="spinner" aria-hidden="true"></span>
+              Loading...
+            </>
+          ) : (
+            'Refresh Trends'
+          )}
         </button>
       </div>
 
