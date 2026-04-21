@@ -305,6 +305,7 @@ source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "nest-asyncio" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -333,6 +334,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = "==23.11.0" },
     { name = "duckdb", specifier = ">=1.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "polars", specifier = ">=0.19.0" },
     { name = "pyarrow", specifier = ">=15.0.0" },
