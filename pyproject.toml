@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = [ "hatchling",]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,30 +7,21 @@ name = "personal-budget-app"
 version = "0.1.0"
 description = "A transaction analyzer that reads Personal Budget App data and creates monthly trends"
 requires-python = ">=3.10"
-dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "python-multipart>=0.0.7",
-    "polars>=0.19.0",
-    "pyarrow>=15.0.0",
-    "duckdb>=1.0.0",
-]
+dependencies = [ "fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "python-multipart>=0.0.7", "polars>=0.19.0", "pyarrow>=15.0.0", "duckdb>=1.0.0", "nest-asyncio>=1.6.0", "toml>=0.10.2", "httpx>=0.28.1",]
+
+[dependency-groups]
+dev = [ "httpx>=0.28.1", "pytest>=7.4.3", "pytest-asyncio>=0.21.1",]
 
 [project.optional-dependencies]
-dev = [
-    "pytest==7.4.3",
-    "pytest-asyncio==0.21.1",
-    "black==23.11.0",
-    "ruff==0.1.8",
-]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src"]
+dev = [ "pytest==7.4.3", "pytest-asyncio==0.21.1", "black==23.11.0", "ruff==0.1.8",]
 
 [tool.black]
 line-length = 100
-target-version = ["py310"]
+target-version = [ "py310",]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.hatch.build.targets.wheel]
+packages = [ "src",]

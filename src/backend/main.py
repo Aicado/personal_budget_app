@@ -1,3 +1,4 @@
+from .llm_service import LLMCategorizer
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +13,7 @@ app = FastAPI(title="Personal Budget App API", version="0.1.0")
 
 # Initialize database
 db = TransactionDatabase()
+categorizer = LLMCategorizer()
 
 @app.on_event("startup")
 def load_data_on_startup():
@@ -21,7 +23,7 @@ def load_data_on_startup():
     transactions_dir = project_root / "data" / "transaction_data"
     if accounts_dir.exists() or transactions_dir.exists():
         try:
-            backfill_database(str(accounts_dir), str(transactions_dir))
+            backfill_database(str(accounts_dir), str(transactions_dir), categorizer=categorizer)
         except Exception as e:
             print(f"Warning: failed to load data on startup: {e}")
 
@@ -67,7 +69,7 @@ async def analyze_file(file: UploadFile = File(...)):
                 "transactions_added": 0
             }
         else:
-            db_result = db.insert_transactions(analyzer.df, file.filename)
+            db_result = db.insert_transactions(analyzer.df, file.filename, categorizer=categorizer)
             db_report = {
                 "status": "inserted",
                 "message": f"Successfully inserted {len(analyzer.df)} transactions",
@@ -109,7 +111,7 @@ async def analyze_multiple_files(files: list[UploadFile] = File(...)):
             # Store each file in database
             duplicate_check = db.file_exists(analyzer.df)
             if not duplicate_check:
-                db_result = db.insert_transactions(analyzer.df, file.filename)
+                db_result = db.insert_transactions(analyzer.df, file.filename, categorizer=categorizer)
                 db_results.append({
                     "filename": file.filename,
                     "status": "inserted",
