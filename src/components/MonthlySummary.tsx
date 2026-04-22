@@ -27,6 +27,11 @@ export function MonthlySummary({ months, inflows, outflows, netAmounts }: Monthl
                 <div className="flow-bar-container">
                   <div
                     className="flow-bar income-bar"
+                    role="meter"
+                    aria-valuenow={inflows[index]}
+                    aria-valuemin={0}
+                    aria-valuemax={maxInflow}
+                    aria-label={`${month} income: $${inflows[index].toFixed(2)}`}
                     style={{
                       width: `${(inflows[index] / maxInflow) * 100}%`,
                       minWidth: inflows[index] > 0 ? '2px' : '0',
@@ -40,6 +45,11 @@ export function MonthlySummary({ months, inflows, outflows, netAmounts }: Monthl
                 <div className="flow-bar-container">
                   <div
                     className="flow-bar expense-bar"
+                    role="meter"
+                    aria-valuenow={outflows[index]}
+                    aria-valuemin={0}
+                    aria-valuemax={maxOutflow}
+                    aria-label={`${month} expenses: $${outflows[index].toFixed(2)}`}
                     style={{
                       width: `${(outflows[index] / maxOutflow) * 100}%`,
                       minWidth: outflows[index] > 0 ? '2px' : '0',
