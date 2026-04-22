@@ -30,6 +30,11 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
               <div className="category-bar-container">
                 <div
                   className="category-bar"
+                  role="meter"
+                  aria-valuenow={amount}
+                  aria-valuemin={0}
+                  aria-valuemax={maxAmount}
+                  aria-label={`${category} spending: $${amount.toFixed(2)}`}
                   style={{
                     width: `${(amount / maxAmount) * 100}%`,
                   }}
