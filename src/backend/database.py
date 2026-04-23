@@ -279,93 +279,155 @@ class TransactionDatabase:
                 .alias("transaction_type")
             )
 
+        # 1. Fetch all relevant payee mappings in bulk to avoid N+1 queries
+        uncat_mask = pl.col("category") == "Uncategorized"
+        if df.filter(uncat_mask).height > 0:
+            unique_payees = df.filter(uncat_mask)["payee"].unique().to_list()
+
+            # Query latest mapping for each payee
+            payee_ser = pl.Series("payee", unique_payees)
+            self.conn.register("temp_payees", pl.DataFrame({"payee": payee_ser}).to_arrow())
+            mapping_df = pl.from_arrow(self.conn.execute("""
+                SELECT payee, category as mapped_category, category_group as mapped_group
+                FROM payee_mappings
+                WHERE payee IN (SELECT payee FROM temp_payees)
+                QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
+            """).fetch_arrow_table())
+            self.conn.unregister("temp_payees")
+
+            if not mapping_df.is_empty():
+                df = df.join(mapping_df, on="payee", how="left")
+                df = df.with_columns([
+                    pl.when(uncat_mask & pl.col("mapped_category").is_not_null())
+                    .then(pl.col("mapped_category"))
+                    .otherwise(pl.col("category"))
+                    .alias("category"),
+                    pl.when(uncat_mask & pl.col("mapped_group").is_not_null())
+                    .then(pl.col("mapped_group"))
+                    .otherwise(pl.col("category_group"))
+                    .alias("category_group")
+                ]).drop(["mapped_category", "mapped_group"])
+
+        # 2. For remaining Uncategorized, call LLM (once per unique payee)
+        remaining_uncat_mask = pl.col("category") == "Uncategorized"
+        if categorizer and df.filter(remaining_uncat_mask).height > 0:
+            all_categories = self.get_all_categories()
+            # Group by payee to only call LLM once per unique unknown payee
+            unique_uncat = df.filter(remaining_uncat_mask).group_by("payee").agg([
+                pl.col("amount").first(),
+                pl.col("date").first()
+            ])
+
+            new_mappings = []
+            for row in unique_uncat.iter_rows(named=True):
+                payee = row["payee"]
+                if not payee: continue
+
+                try:
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+
+                    if loop.is_running():
+                        import nest_asyncio
+                        nest_asyncio.apply()
+
+                    llm_result = loop.run_until_complete(
+                        categorizer.categorize_transaction(
+                            payee, row["amount"], str(row["date"]), all_categories
+                        )
+                    )
+
+                    if llm_result:
+                        new_mappings.append({
+                            "payee": payee,
+                            "llm_category": llm_result["category"],
+                            "llm_group": llm_result["category_group"]
+                        })
+                        self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
+                        if llm_result["category"] not in all_categories:
+                            all_categories.append(llm_result["category"])
+                except Exception as e:
+                    print(f"LLM Categorization failed for {payee}: {e}")
+
+            if new_mappings:
+                new_map_df = pl.DataFrame(new_mappings)
+                df = df.join(new_map_df, on="payee", how="left")
+                df = df.with_columns([
+                    pl.when(remaining_uncat_mask & pl.col("llm_category").is_not_null())
+                    .then(pl.col("llm_category"))
+                    .otherwise(pl.col("category"))
+                    .alias("category"),
+                    pl.when(remaining_uncat_mask & pl.col("llm_group").is_not_null())
+                    .then(pl.col("llm_group"))
+                    .otherwise(pl.col("category_group"))
+                    .alias("category_group")
+                ]).drop(["llm_category", "llm_group"])
+
+        # Register any new categories discovered
         categories = df.select(["category", "category_group"]).unique().to_dicts()
         self.register_categories(categories)
 
-        # Prepare data for insertion
-        records = []
-        all_categories = self.get_all_categories()
+        # 3. Finalize dataframe for bulk insertion
+        # Ensure all required columns exist and are in the right order/type
+        # We use select() with aliases to handle missing columns gracefully
 
-        for row in df.iter_rows(named=True):
-            payee = row.get("payee", "")
-            category = row.get("category", "Uncategorized")
-            category_group = row.get("category_group", "Uncategorized")
+        # Ensure date is pl.Date (it might be string in some tests)
+        if df["date"].dtype == pl.Utf8:
+            df = df.with_columns(
+                pl.col("date").str.strptime(pl.Date, strict=False, format="%Y-%m-%d")
+            )
 
-            # If uncategorized, try to use LLM or existing mapping
-            if category == "Uncategorized" and payee and categorizer:
-                # Check mapping table first
-                mapping = self.get_payee_mapping(payee)
-                if mapping:
-                    category = mapping["category"]
-                    category_group = mapping["category_group"]
-                else:
-                    # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
-                    try:
-                        # Try to get event loop
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
+        # Define default values for missing columns
+        defaults = {
+            "account": pl.lit("Unknown"),
+            "account_type": pl.lit("Unknown"),
+            "account_path": pl.lit(""),
+            "description": pl.lit(""),
+            "outflow": pl.lit(0.0).cast(pl.Float64),
+            "inflow": pl.lit(0.0).cast(pl.Float64),
+            "amount": pl.lit(0.0).cast(pl.Float64),
+            "transaction_type": pl.lit("transfer")
+        }
 
-                        if loop.is_running():
-                            # We are already in an async context, but this method is sync.
-                            # This is tricky in FastAPI. For now, let's assume we can block if needed or
-                            # we should have made this async.
-                            # Since we want to support Costello's Costco example, let's do a quick blocking call.
-                            import nest_asyncio
-                            nest_asyncio.apply()
-
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row.get("amount", 0), str(row.get("date", "")), all_categories
-                            )
-                        )
-
-                        if llm_result:
-                            category = llm_result["category"]
-                            category_group = llm_result["category_group"]
-                            # Save mapping for future
-                            self.save_payee_mapping(payee, category, category_group, llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
-                            if category not in all_categories:
-                                all_categories.append(category)
-                    except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
-
-            records.append({
-                "file_hash": file_hash,
-                "account": row.get("account", "Unknown"),
-                "account_type": row.get("account_type", "Unknown"),
-                "account_path": row.get("account_path", ""),
-                "date": row.get("date"),
-                "payee": row.get("payee", ""),
-                "category": category,
-                "category_group": category_group,
-                "description": row.get("description", ""),
-                "outflow": float(row.get("outflow", 0)),
-                "inflow": float(row.get("inflow", 0)),
-                "amount": float(row.get("amount", 0)),
-                "transaction_type": row.get("transaction_type", "transfer"),
-                "month_year": row.get("month_str", ""),
-                "file_source": filename
-            })
+        final_df = df.with_columns([
+            pl.lit(file_hash).alias("file_hash"),
+            pl.col("date").dt.strftime("%Y-%m").alias("month_year"),
+            pl.lit(filename).alias("file_source")
+        ])
         
-        insert_df = pl.DataFrame(records)
-        self.conn.register("temp_insert", insert_df.to_arrow())
+        # Add missing columns with defaults
+        for col, expr in defaults.items():
+            if col not in final_df.columns:
+                final_df = final_df.with_columns(expr.alias(col))
+            else:
+                # If column exists, fill nulls and ensure type
+                if col in ["outflow", "inflow", "amount"]:
+                    final_df = final_df.with_columns(pl.col(col).cast(pl.Float64).fill_null(0.0))
+                else:
+                    final_df = final_df.with_columns(pl.col(col).fill_null(defaults[col]))
+
+        final_df = final_df.select([
+            "file_hash", "account", "account_type", "account_path", "date", "payee",
+            "category", "category_group", "description", "outflow", "inflow",
+            "amount", "transaction_type", "month_year", "file_source"
+        ])
+
+        # Bulk insert using DuckDB's native Polars support
+        self.conn.register("temp_insert", final_df.to_arrow())
         self.conn.execute("""
             INSERT INTO transactions 
             (file_hash, account, account_type, account_path, date, payee, category, category_group, description, outflow, inflow, amount, transaction_type, month_year, file_source)
-            SELECT file_hash, account, account_type, account_path, date, payee, category, category_group, description, outflow, inflow, amount, transaction_type, month_year, file_source
-            FROM temp_insert
-        """
-        )
+            SELECT * FROM temp_insert
+        """)
         self.conn.unregister("temp_insert")
         
         return {
             "status": "inserted",
-            "message": f"Successfully inserted {len(records)} transactions",
-            "records_count": len(records),
+            "message": f"Successfully inserted {final_df.height} transactions",
+            "records_count": final_df.height,
             "file_hash": file_hash,
             "filename": filename
         }
