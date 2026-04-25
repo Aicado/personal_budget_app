@@ -11,7 +11,7 @@ interface MonthlyTrend {
 
 export const SpendingTrendsTab: React.FC = () => {
   const [trendsData, setTrendsData] = useState<MonthlyTrend | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchTrendsData = async () => {
@@ -39,7 +39,10 @@ export const SpendingTrendsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchTrendsData()
+    const timer = setTimeout(() => {
+      void fetchTrendsData()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   return (

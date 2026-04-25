@@ -32,10 +32,17 @@ export const AccountsTab: React.FC = () => {
   const [filter, setFilter] = useState<FilterType>('all')
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const formatCurrency = (value: number) => {
+    const formatted = Math.abs(value).toFixed(2)
+    return value < 0 ? `-$${formatted}` : `$${formatted}`
+  }
+
   const fetchAccounts = async () => {
+    // Avoid synchronous setState in useEffect
+    await Promise.resolve()
     setLoading(true)
     setError(null)
     try {
@@ -53,15 +60,24 @@ export const AccountsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchAccounts()
+    // Avoid synchronous setState in effect
+    const timer = setTimeout(() => {
+      void fetchAccounts()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const toggleAccountExpansion = async (accountName: string) => {
+    const isExpanded = expandedAccounts.has(accountName)
     const newExpanded = new Set(expandedAccounts)
-    if (newExpanded.has(accountName)) {
+
+    if (isExpanded) {
       newExpanded.delete(accountName)
+      setExpandedAccounts(newExpanded)
     } else {
       newExpanded.add(accountName)
+      setExpandedAccounts(newExpanded)
+
       // Fetch transactions if not already loaded
       if (!accountTransactions[accountName]) {
         try {
@@ -69,17 +85,21 @@ export const AccountsTab: React.FC = () => {
           const response = await fetch(`http://localhost:8000/accounts/${encodedName}/transactions`)
           if (response.ok) {
             const data = await response.json()
-            setAccountTransactions(prev => ({
+            setAccountTransactions((prev) => ({
               ...prev,
-              [accountName]: data.transactions || []
+              [accountName]: data.transactions || [],
             }))
           }
         } catch (err) {
           console.error('Failed to fetch transactions:', err)
+          // Ensure we don't stay in a permanent loading state on error
+          setAccountTransactions((prev) => ({
+            ...prev,
+            [accountName]: [],
+          }))
         }
       }
     }
-    setExpandedAccounts(newExpanded)
   }
 
   const accountsNeedingData = accounts.filter((account) => account.needs_current_balance || account.needs_transactions)
@@ -103,6 +123,7 @@ export const AccountsTab: React.FC = () => {
               className={`btn btn-secondary ${filter === 'all' ? 'active-filter' : ''}`}
               onClick={() => setFilter('all')}
               disabled={loading}
+              aria-pressed={filter === 'all'}
             >
               All Accounts
             </button>
@@ -110,6 +131,7 @@ export const AccountsTab: React.FC = () => {
               className={`btn btn-secondary ${filter === 'needs-data' ? 'active-filter' : ''}`}
               onClick={() => setFilter('needs-data')}
               disabled={loading}
+              aria-pressed={filter === 'needs-data'}
             >
               Needs Data ({needsDataCount})
             </button>
@@ -207,7 +229,7 @@ export const AccountsTab: React.FC = () => {
                     <div className="detail-item">
                       <span className="label">Current Balance:</span>
                       <span className={`value ${account.current_balance_present ? 'value-positive' : 'value-negative'}`}>
-                        {account.current_balance_present ? `$${account.net_value.toFixed(2)}` : 'Missing'}
+                        {account.current_balance_present ? formatCurrency(account.net_value) : 'Missing'}
                       </span>
                     </div>
                     {account.current_balance_present && (
@@ -217,11 +239,22 @@ export const AccountsTab: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  {expandedAccounts.has(account.name) && accountTransactions[account.name] && (
+                  {expandedAccounts.has(account.name) && (
                     <div className="account-transactions" id={`transactions-${account.name.replace(/\s+/g, '-').toLowerCase()}`}>
                       <h4>Recent Transactions</h4>
                       <div className="transactions-table-container">
+                        {!accountTransactions[account.name] ? (
+                          <div className="loading" style={{ padding: '2rem' }}>
+                            <span className="spinner" aria-hidden="true" style={{ borderTopColor: '#667eea' }}></span>
+                            Fetching transactions...
+                          </div>
+                        ) : accountTransactions[account.name].length === 0 ? (
+                          <div className="no-data" style={{ padding: '2rem' }}>
+                            No transactions found for this account.
+                          </div>
+                        ) : (
                         <table className="transactions-table">
+                          <caption className="sr-only">Recent transactions for {account.name}</caption>
                           <thead>
                             <tr>
                               <th>Date</th>
@@ -238,15 +271,16 @@ export const AccountsTab: React.FC = () => {
                                 <td>{transaction.date}</td>
                                 <td>{transaction.payee}</td>
                                 <td>{transaction.category}</td>
-                                <td className="value-negative">${transaction.outflow.toFixed(2)}</td>
-                                <td className="value-positive">${transaction.inflow.toFixed(2)}</td>
+                                <td className="value-negative">{formatCurrency(transaction.outflow)}</td>
+                                <td className="value-positive">{formatCurrency(transaction.inflow)}</td>
                                 <td className={`value ${transaction.amount >= 0 ? 'value-positive' : 'value-negative'}`}>
-                                  ${transaction.amount.toFixed(2)}
+                                  {formatCurrency(transaction.amount)}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        )}
                       </div>
                     </div>
                   )}

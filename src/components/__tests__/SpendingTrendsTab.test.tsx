@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { SpendingTrendsTab } from '../tabs/SpendingTrendsTab'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -20,7 +20,7 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders data after loading', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => mockData
     })
@@ -38,7 +38,7 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders error message on fetch failure', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: false
     })
 

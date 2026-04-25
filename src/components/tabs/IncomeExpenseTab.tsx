@@ -8,7 +8,7 @@ interface CategoryData {
 
 export const IncomeExpenseTab: React.FC = () => {
   const [categoryData, setCategoryData] = useState<CategoryData>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchCategoryData = async () => {
@@ -30,7 +30,10 @@ export const IncomeExpenseTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchCategoryData()
+    const timer = setTimeout(() => {
+      void fetchCategoryData()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const totalIncome = Object.values(categoryData).reduce((sum, val) => {
