@@ -17,7 +17,7 @@ interface CurrentBalances {
 
 export const NetWorthTab: React.FC = () => {
   const [balanceData, setBalanceData] = useState<CurrentBalances | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchCurrentBalances = async () => {
@@ -49,7 +49,10 @@ export const NetWorthTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchCurrentBalances()
+    const timer = setTimeout(() => {
+      void fetchCurrentBalances()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   return (
