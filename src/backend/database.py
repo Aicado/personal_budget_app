@@ -328,35 +328,43 @@ class TransactionDatabase:
                 import nest_asyncio
                 nest_asyncio.apply()
 
-                llm_mappings = {}
-                for row in unique_uncat_payees:
-                    payee = row["payee"]
-                    try:
-                        # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
 
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row["amount"], str(row["date"]), all_categories
-                            )
+                # Parallelize LLM calls to significantly reduce ingestion latency
+                # This reduces time from O(N_payees) to O(1) [constrained by Ollama's concurrency]
+                async def categorize_all():
+                    tasks = [
+                        categorizer.categorize_transaction(
+                            row["payee"], row["amount"], str(row["date"]), all_categories
                         )
+                        for row in unique_uncat_payees
+                    ]
+                    return await asyncio.gather(*tasks, return_exceptions=True)
 
-                        if llm_result:
-                            llm_mappings[payee] = {
-                                "category": llm_result["category"],
-                                "category_group": llm_result["category_group"]
-                            }
-                            # Save mapping for future
-                            self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
-                            if llm_result["category"] not in all_categories:
-                                all_categories.append(llm_result["category"])
-                    except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
+                results = loop.run_until_complete(categorize_all())
+
+                llm_mappings = {}
+                for row, llm_result in zip(unique_uncat_payees, results):
+                    payee = row["payee"]
+                    if isinstance(llm_result, Exception):
+                        print(f"LLM Categorization failed for {payee}: {llm_result}")
+                        continue
+
+                    if llm_result:
+                        llm_mappings[payee] = {
+                            "category": llm_result["category"],
+                            "category_group": llm_result["category_group"]
+                        }
+                        # Save mapping for future to avoid LLM calls for same payee in next ingestion
+                        self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
+
+                        # Add to known categories to help LLM stay consistent for future ingestion batches
+                        if llm_result["category"] not in all_categories:
+                            all_categories.append(llm_result["category"])
 
                 # Apply LLM mappings back to the main dataframe
                 if llm_mappings:
