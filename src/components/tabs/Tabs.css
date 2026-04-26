@@ -97,7 +97,7 @@
 
 .tab-header p {
   margin: 0 0 1rem 0;
-  color: #7f8c8d;
+  color: #546e7a;
   font-size: 0.95rem;
 }
 
@@ -156,7 +156,7 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #7f8c8d;
+  color: #546e7a;
   transition: color 0.2s ease;
   padding: 0;
   width: 30px;
@@ -434,7 +434,7 @@
 
 /* Improve text contrast */
 .detail-item .label {
-  color: #7f8c8d;
+  color: #546e7a;
   font-weight: 600;
 }
 
@@ -649,7 +649,7 @@
 }
 
 .card-label {
-  color: #7f8c8d;
+  color: #546e7a;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -706,7 +706,7 @@
 }
 
 .nw-label {
-  color: #7f8c8d;
+  color: #546e7a;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -788,7 +788,7 @@
 }
 
 .trend-label {
-  color: #7f8c8d;
+  color: #546e7a;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -809,7 +809,7 @@
 .no-data {
   text-align: center;
   padding: 3rem 1rem;
-  color: #7f8c8d;
+  color: #546e7a;
   font-size: 1.1rem;
 }
 
@@ -823,7 +823,7 @@
 }
 
 .info-text {
-  color: #7f8c8d;
+  color: #546e7a;
   font-style: italic;
   text-align: center;
   margin: 2rem 0;
