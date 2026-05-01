@@ -39,7 +39,10 @@ export const SpendingTrendsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchTrendsData()
+    const init = async () => {
+      await fetchTrendsData()
+    }
+    init()
   }, [])
 
   return (

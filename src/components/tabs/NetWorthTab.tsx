@@ -49,7 +49,10 @@ export const NetWorthTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchCurrentBalances()
+    const init = async () => {
+      await fetchCurrentBalances()
+    }
+    init()
   }, [])
 
   return (
