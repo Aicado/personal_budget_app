@@ -813,6 +813,10 @@
   font-size: 1.1rem;
 }
 
+.mt-4 {
+  margin-top: 1rem;
+}
+
 .error-message {
   background: #fadbd8;
   border: 2px solid #e74c3c;
