@@ -9,3 +9,7 @@
 ## 2025-05-17 - [Data Visualization Accessibility]
 **Learning:** For static data visualizations representing a measurement within a known range (e.g., spending categories), `role="meter"` is more semantic than `role="progressbar"`. Adding `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, and a descriptive `aria-label` ensures these visual elements are accessible to screen reader users.
 **Action:** Use `role="meter"` for static visualizations and `role="progressbar"` for ongoing tasks. Always provide quantitative values via ARIA attributes and a clear text label.
+
+## 2025-05-18 - [Empty State Recovery]
+**Learning:** When filters result in an empty state, providing a clear "recovery action" (like a "Show All" or "Reset" button) directly in the no-results message prevents user frustration and navigation dead-ends.
+**Action:** Always include a recovery button in empty state messages that allows the user to reset the filter or search that led to the zero-results view.
