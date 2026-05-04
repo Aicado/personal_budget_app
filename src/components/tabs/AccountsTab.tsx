@@ -53,8 +53,21 @@ export const AccountsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchAccounts()
+    const init = async () => {
+      await fetchAccounts()
+    }
+    init()
   }, [])
+
+  const scrollToAccount = (accountName: string) => {
+    const id = `account-${accountName.replace(/\s+/g, '-').toLowerCase()}`
+    const element = document.getElementById(id)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      element.classList.add('highlight-flash')
+      setTimeout(() => element.classList.remove('highlight-flash'), 2000)
+    }
+  }
 
   const toggleAccountExpansion = async (accountName: string) => {
     const newExpanded = new Set(expandedAccounts)
@@ -129,10 +142,12 @@ export const AccountsTab: React.FC = () => {
         <>
           <div className="accounts-summary">
             <div className="summary-item">
+              <span className="summary-icon" aria-hidden="true">🏦</span>
               <span>Total Accounts</span>
               <strong>{accounts.length}</strong>
             </div>
             <div className="summary-item">
+              <span className="summary-icon" aria-hidden="true">⚠️</span>
               <span>Accounts needing data</span>
               <strong>{needsDataCount}</strong>
             </div>
@@ -143,15 +158,20 @@ export const AccountsTab: React.FC = () => {
               <h3>Data needed</h3>
               <p>Accounts below still require either transaction history or a current balance file.</p>
             </div>
-            {needsDataCount > 0 ? (
+            {needsDataCount > 0 && filter !== 'needs-data' ? (
               <div className="needs-data-list">
                 {accountsNeedingData.map((account, idx) => (
-                  <div key={idx} className="needs-data-item">
+                  <button
+                    key={idx}
+                    className="needs-data-item"
+                    onClick={() => scrollToAccount(account.name)}
+                    aria-label={`Go to ${account.name}`}
+                  >
                     <span>{account.name}</span>
                     <span className={`needs-data-tag ${account.needs_transactions ? 'needs-transactions' : 'needs-balance'}`}>
                       {account.needs_transactions ? 'Transactions missing' : 'Balance missing'}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -165,10 +185,19 @@ export const AccountsTab: React.FC = () => {
             {filteredAccounts.length === 0 ? (
               <div className="no-data">
                 <p>No accounts found matching the selected filter.</p>
+                {filter !== 'all' && (
+                  <button className="btn btn-secondary mt-4" onClick={() => setFilter('all')}>
+                    Show All Accounts
+                  </button>
+                )}
               </div>
             ) : (
               filteredAccounts.map((account, idx) => (
-                <div key={idx} className={`account-card ${account.needs_current_balance || account.needs_transactions ? 'needs-data' : ''}`}>
+                <div
+                  key={idx}
+                  id={`account-${account.name.replace(/\s+/g, '-').toLowerCase()}`}
+                  className={`account-card ${account.needs_current_balance || account.needs_transactions ? 'needs-data' : ''}`}
+                >
                   <div className="account-header">
                     <h3>{account.name}</h3>
                     <div className="account-header-actions">

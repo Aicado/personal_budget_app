@@ -558,6 +558,26 @@
   background: white;
   border: 1px solid #e6ecf1;
   border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.needs-data-item:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+  transform: translateX(4px);
+}
+
+.needs-data-item:focus-visible {
+  outline: 3px solid #667eea;
+  outline-offset: 2px;
+}
+
+.needs-data-item:active {
+  transform: scale(0.98);
 }
 
 .needs-data-tag {
@@ -585,6 +605,29 @@
   border: 1px solid #d4efdf;
   border-radius: 10px;
   color: #27ae60;
+}
+
+.summary-icon {
+  font-size: 1.2rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.highlight-flash {
+  animation: flash 2s ease-out;
+}
+
+@keyframes flash {
+  0% {
+    background-color: rgba(102, 126, 234, 0.2);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+  }
+  100% {
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .status-badge {

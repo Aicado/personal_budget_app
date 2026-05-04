@@ -3,7 +3,7 @@ import { SpendingTrendsTab } from '../tabs/SpendingTrendsTab'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock fetch
-global.fetch = vi.fn()
+vi.stubGlobal('fetch', vi.fn())
 
 describe('SpendingTrendsTab', () => {
   const mockData = {
@@ -20,10 +20,10 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders data after loading', async () => {
-    (global.fetch as any).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => mockData
-    })
+    } as Response)
 
     render(<SpendingTrendsTab />)
 
@@ -38,9 +38,9 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders error message on fetch failure', async () => {
-    (global.fetch as any).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue({
       ok: false
-    })
+    } as Response)
 
     render(<SpendingTrendsTab />)
 
