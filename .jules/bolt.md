@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Vectorized Ingestion vs Row-by-row Mapping]
 **Learning:** Vectorizing Polars ingestion and using a single SQL query with `QUALIFY ROW_NUMBER()` to fetch unique mappings significantly outperforms row-by-row loops and repeated SQL calls during data ingestion. This reduced ingestion overhead by ~75%.
 **Action:** Always prefer vectorized joins for mapping operations in ingestion pipelines and deduplicate external service calls (like LLM) by grouping unique keys.
+
+## 2025-05-16 - [Parallel LLM Categorization with Semaphore]
+**Learning:** Parallelizing I/O-bound LLM categorization calls using `asyncio.gather` in a synchronous database method (via `nest_asyncio`) significantly reduces ingestion latency (up to 87%). Using an `asyncio.Semaphore` is critical to avoid overwhelming local LLM services like Ollama.
+**Action:** When performing multiple independent I/O-bound tasks in ingestion pipelines, always use `asyncio.gather` with a concurrency limit (Semaphore) to maximize throughput without sacrificing stability.
