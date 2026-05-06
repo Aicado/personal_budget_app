@@ -24,7 +24,7 @@ class TransactionDatabase:
     def _initialize_db(self):
         """Initialize database and create tables if they don't exist."""
         self.conn = duckdb.connect(self.db_path)
-        
+
         # Create transactions table with basic metadata and account/category references
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
@@ -82,7 +82,6 @@ class TransactionDatabase:
             )
         """)
 
-        
         # Create index on file_hash for duplicate detection
         try:
             self.conn.execute("""
@@ -90,7 +89,7 @@ class TransactionDatabase:
             """)
         except Exception:
             pass  # Index already exists
-        
+
         # Create index on date for range queries
         try:
             self.conn.execute("""
@@ -131,9 +130,18 @@ class TransactionDatabase:
         """)
         self.conn.unregister("new_categories")
 
-    def register_account(self, account_name: str, account_type: str, account_path: str, current_debit: float = 0.0, current_credit: float = 0.0, net_value: float = 0.0) -> None:
+    def register_account(
+        self,
+        account_name: str,
+        account_type: str,
+        account_path: str,
+        current_debit: float = 0.0,
+        current_credit: float = 0.0,
+        net_value: float = 0.0,
+    ) -> None:
         """Register or update an account with its current balance."""
-        self.conn.execute("""
+        self.conn.execute(
+            """
             INSERT INTO accounts (account_name, account_type, account_path, current_debit, current_credit, net_value, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT (account_path) DO UPDATE SET
@@ -143,7 +151,9 @@ class TransactionDatabase:
                 current_credit = EXCLUDED.current_credit,
                 net_value = EXCLUDED.net_value,
                 updated_at = EXCLUDED.updated_at
-        """, [account_name, account_type, account_path, current_debit, current_credit, net_value])
+        """,
+            [account_name, account_type, account_path, current_debit, current_credit, net_value],
+        )
 
     def get_account_balances(self) -> List[Dict[str, Any]]:
         """Get all current account balances."""
@@ -160,7 +170,7 @@ class TransactionDatabase:
                 "debit": row[2],
                 "credit": row[3],
                 "net_value": row[4],
-                "updated_at": str(row[5])
+                "updated_at": str(row[5]),
             }
             for row in rows
         ]
@@ -217,7 +227,7 @@ class TransactionDatabase:
                 "current_credit": row[9],
                 "net_value": row[10],
                 "needs_current_balance": not bool(row[6]),
-                "needs_transactions": int(row[3]) == 0
+                "needs_transactions": int(row[3]) == 0,
             }
             for row in rows
         ]
@@ -226,41 +236,58 @@ class TransactionDatabase:
         """Check if this file's data already exists in the database."""
         file_hash = self._compute_file_hash(df)
 
-        result = self.conn.execute("""
+        result = self.conn.execute(
+            """
             SELECT COUNT(*) as count FROM transactions WHERE file_hash = ?
-        """, [file_hash]).fetchall()
+        """,
+            [file_hash],
+        ).fetchall()
 
         return result[0][0] > 0
 
-    def insert_transactions(self, df: pl.DataFrame, filename: str, account_name: str = None, account_type: str = None, account_path: str = None, categorizer=None) -> Dict[str, Any]:
+    def insert_transactions(
+        self,
+        df: pl.DataFrame,
+        filename: str,
+        account_name: str = None,
+        account_type: str = None,
+        account_path: str = None,
+        categorizer=None,
+    ) -> Dict[str, Any]:
         """Insert transactions into database and return summary."""
         file_hash = self._compute_file_hash(df)
-        
+
         # Check if file already exists
         if self.file_exists(df):
-            existing = self.conn.execute("""
+            existing = self.conn.execute(
+                """
                 SELECT COUNT(*) as count, MIN(date) as start_date, MAX(date) as end_date
                 FROM transactions WHERE file_hash = ?
-            """, [file_hash]).fetchall()
-            
+            """,
+                [file_hash],
+            ).fetchall()
+
             return {
                 "status": "duplicate",
                 "message": "File data already exists in database",
                 "existing_records": existing[0][0],
-                "date_range": {
-                    "start": str(existing[0][1]),
-                    "end": str(existing[0][2])
-                }
+                "date_range": {"start": str(existing[0][1]), "end": str(existing[0][2])},
             }
 
         df = df.clone()
 
         # Attach account metadata to transactions when available
-        if account_name and ("account" not in df.columns or df["account"].null_count() == df.height):
+        if account_name and (
+            "account" not in df.columns or df["account"].null_count() == df.height
+        ):
             df = df.with_columns(pl.lit(account_name).alias("account"))
-        if account_type and ("account_type" not in df.columns or df["account_type"].null_count() == df.height):
+        if account_type and (
+            "account_type" not in df.columns or df["account_type"].null_count() == df.height
+        ):
             df = df.with_columns(pl.lit(account_type).alias("account_type"))
-        if account_path and ("account_path" not in df.columns or df["account_path"].null_count() == df.height):
+        if account_path and (
+            "account_path" not in df.columns or df["account_path"].null_count() == df.height
+        ):
             df = df.with_columns(pl.lit(account_path).alias("account_path"))
 
         # Ensure required columns exist
@@ -268,7 +295,12 @@ class TransactionDatabase:
             df = df.with_columns(pl.lit("Uncategorized").alias("category"))
         if "category_group" not in df.columns:
             df = df.with_columns(
-                pl.col("category").cast(pl.Utf8).str.split("/").list.get(0).str.strip_chars().alias("category_group")
+                pl.col("category")
+                .cast(pl.Utf8)
+                .str.split("/")
+                .list.get(0)
+                .str.strip_chars()
+                .alias("category_group")
             )
         if "transaction_type" not in df.columns:
             df = df.with_columns(
@@ -288,117 +320,144 @@ class TransactionDatabase:
 
         # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries
         # Use GROUP BY to ensure unique payees for the join, taking the most recent mapping
-        mappings_df = pl.from_arrow(
-            self.conn.execute("""
+        mappings_df = pl.from_arrow(self.conn.execute("""
                 SELECT payee, category, category_group
                 FROM payee_mappings
                 QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
-            """).fetch_arrow_table()
-        )
+            """).fetch_arrow_table())
 
         if not mappings_df.is_empty():
             # Only map for Uncategorized transactions
             uncat_mask = pl.col("category") == "Uncategorized"
             df = df.join(mappings_df, on="payee", how="left", suffix="_mapped")
-            df = df.with_columns([
-                pl.when(uncat_mask & pl.col("category_mapped").is_not_null())
-                .then(pl.col("category_mapped"))
-                .otherwise(pl.col("category"))
-                .alias("category"),
-                pl.when(uncat_mask & pl.col("category_group_mapped").is_not_null())
-                .then(pl.col("category_group_mapped"))
-                .otherwise(pl.col("category_group"))
-                .alias("category_group")
-            ]).drop(["category_mapped", "category_group_mapped"])
+            df = df.with_columns(
+                [
+                    pl.when(uncat_mask & pl.col("category_mapped").is_not_null())
+                    .then(pl.col("category_mapped"))
+                    .otherwise(pl.col("category"))
+                    .alias("category"),
+                    pl.when(uncat_mask & pl.col("category_group_mapped").is_not_null())
+                    .then(pl.col("category_group_mapped"))
+                    .otherwise(pl.col("category_group"))
+                    .alias("category_group"),
+                ]
+            ).drop(["category_mapped", "category_group_mapped"])
 
         # Handle remaining Uncategorized transactions with LLM if categorizer is provided
         if categorizer:
-            all_categories = self.get_all_categories()
+            all_categories = list(self.get_all_categories())
 
             # Find unique payees that still need categorization to minimize LLM calls
-            needs_llm_df = df.filter((pl.col("category") == "Uncategorized") & (pl.col("payee") != ""))
+            needs_llm_df = df.filter(
+                (pl.col("category") == "Uncategorized") & (pl.col("payee") != "")
+            )
 
             if not needs_llm_df.is_empty():
-                unique_uncat_payees = needs_llm_df.group_by("payee").agg([
-                    pl.col("amount").first(),
-                    pl.col("date").first()
-                ]).to_dicts()
+                unique_uncat_payees = (
+                    needs_llm_df.group_by("payee")
+                    .agg([pl.col("amount").first(), pl.col("date").first()])
+                    .to_dicts()
+                )
 
                 # Pre-apply nest_asyncio once if needed
                 import nest_asyncio
+
                 nest_asyncio.apply()
 
+                # Parallelize LLM calls to significantly reduce ingestion latency
+                # Using a Semaphore to prevent overwhelming local LLM instances
+                async def categorize_all():
+                    semaphore = asyncio.Semaphore(10)
+
+                    async def sem_categorize(row):
+                        async with semaphore:
+                            payee = row["payee"]
+                            try:
+                                res = await categorizer.categorize_transaction(
+                                    payee, row["amount"], str(row["date"]), all_categories
+                                )
+                                return payee, res
+                            except Exception as e:
+                                print(f"LLM Categorization failed for {payee}: {e}")
+                                return payee, None
+
+                    tasks = [sem_categorize(row) for row in unique_uncat_payees]
+                    return await asyncio.gather(*tasks)
+
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                results = loop.run_until_complete(categorize_all())
+
                 llm_mappings = {}
-                for row in unique_uncat_payees:
-                    payee = row["payee"]
-                    try:
-                        # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row["amount"], str(row["date"]), all_categories
-                            )
+                for payee, llm_result in results:
+                    if llm_result:
+                        llm_mappings[payee] = {
+                            "category": llm_result["category"],
+                            "category_group": llm_result["category_group"],
+                        }
+                        # Save mapping for future
+                        self.save_payee_mapping(
+                            payee,
+                            llm_result["category"],
+                            llm_result["category_group"],
+                            llm_result["confidence"],
                         )
-
-                        if llm_result:
-                            llm_mappings[payee] = {
-                                "category": llm_result["category"],
-                                "category_group": llm_result["category_group"]
-                            }
-                            # Save mapping for future
-                            self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
-                            if llm_result["category"] not in all_categories:
-                                all_categories.append(llm_result["category"])
-                    except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
 
                 # Apply LLM mappings back to the main dataframe
                 if llm_mappings:
-                    llm_df = pl.DataFrame([
-                        {"payee": k, "cat_llm": v["category"], "grp_llm": v["category_group"]}
-                        for k, v in llm_mappings.items()
-                    ])
+                    llm_df = pl.DataFrame(
+                        [
+                            {"payee": k, "cat_llm": v["category"], "grp_llm": v["category_group"]}
+                            for k, v in llm_mappings.items()
+                        ]
+                    )
                     df = df.join(llm_df, on="payee", how="left")
-                    df = df.with_columns([
-                        pl.when(pl.col("cat_llm").is_not_null())
-                        .then(pl.col("cat_llm"))
-                        .otherwise(pl.col("category"))
-                        .alias("category"),
-                        pl.when(pl.col("grp_llm").is_not_null())
-                        .then(pl.col("grp_llm"))
-                        .otherwise(pl.col("category_group"))
-                        .alias("category_group")
-                    ]).drop(["cat_llm", "grp_llm"])
+                    df = df.with_columns(
+                        [
+                            pl.when(pl.col("cat_llm").is_not_null())
+                            .then(pl.col("cat_llm"))
+                            .otherwise(pl.col("category"))
+                            .alias("category"),
+                            pl.when(pl.col("grp_llm").is_not_null())
+                            .then(pl.col("grp_llm"))
+                            .otherwise(pl.col("category_group"))
+                            .alias("category_group"),
+                        ]
+                    ).drop(["cat_llm", "grp_llm"])
 
         # Ensure account columns exist if missing from input DF
-        for col, default in [("account", "Unknown"), ("account_type", "Unknown"), ("account_path", "")]:
+        for col, default in [
+            ("account", "Unknown"),
+            ("account_type", "Unknown"),
+            ("account_path", ""),
+        ]:
             if col not in df.columns:
                 df = df.with_columns(pl.lit(default).alias(col))
 
         # Final preparation of the dataframe for DuckDB insertion
-        insert_df = df.select([
-            pl.lit(file_hash).alias("file_hash"),
-            pl.col("account").fill_null("Unknown").alias("account"),
-            pl.col("account_type").fill_null("Unknown").alias("account_type"),
-            pl.col("account_path").fill_null("").alias("account_path"),
-            pl.col("date"),
-            pl.col("payee").fill_null("").alias("payee"),
-            pl.col("category"),
-            pl.col("category_group"),
-            pl.col("description").fill_null("").alias("description"),
-            pl.col("outflow").cast(pl.Float64).fill_null(0.0),
-            pl.col("inflow").cast(pl.Float64).fill_null(0.0),
-            pl.col("amount").cast(pl.Float64).fill_null(0.0),
-            pl.col("transaction_type"),
-            pl.col("month_str").alias("month_year"),
-            pl.lit(filename).alias("file_source")
-        ])
+        insert_df = df.select(
+            [
+                pl.lit(file_hash).alias("file_hash"),
+                pl.col("account").fill_null("Unknown").alias("account"),
+                pl.col("account_type").fill_null("Unknown").alias("account_type"),
+                pl.col("account_path").fill_null("").alias("account_path"),
+                pl.col("date"),
+                pl.col("payee").fill_null("").alias("payee"),
+                pl.col("category"),
+                pl.col("category_group"),
+                pl.col("description").fill_null("").alias("description"),
+                pl.col("outflow").cast(pl.Float64).fill_null(0.0),
+                pl.col("inflow").cast(pl.Float64).fill_null(0.0),
+                pl.col("amount").cast(pl.Float64).fill_null(0.0),
+                pl.col("transaction_type"),
+                pl.col("month_str").alias("month_year"),
+                pl.lit(filename).alias("file_source"),
+            ]
+        )
 
         # Register categories discovered during the process
         new_categories = insert_df.select(["category", "category_group"]).unique().to_dicts()
@@ -409,45 +468,48 @@ class TransactionDatabase:
             (file_hash, account, account_type, account_path, date, payee, category, category_group, description, outflow, inflow, amount, transaction_type, month_year, file_source)
             SELECT file_hash, account, account_type, account_path, date, payee, category, category_group, description, outflow, inflow, amount, transaction_type, month_year, file_source
             FROM temp_insert
-        """
-        )
+        """)
         self.conn.unregister("temp_insert")
-        
+
         return {
             "status": "inserted",
             "message": f"Successfully inserted {insert_df.height} transactions",
             "records_count": insert_df.height,
             "file_hash": file_hash,
-            "filename": filename
+            "filename": filename,
         }
 
     def get_transactions_by_date_range(self, start_date: str, end_date: str) -> pl.DataFrame:
         """Retrieve transactions within a date range."""
         return pl.from_arrow(
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 SELECT * FROM transactions 
                 WHERE date >= ? AND date <= ?
                 ORDER BY date DESC
-            """, [start_date, end_date]).fetch_arrow_table()
+            """,
+                [start_date, end_date],
+            ).fetch_arrow_table()
         )
 
     def get_transactions_by_category(self, category: str) -> pl.DataFrame:
         """Retrieve transactions for a specific category."""
         return pl.from_arrow(
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 SELECT * FROM transactions 
                 WHERE category = ?
                 ORDER BY date DESC
-            """, [category]).fetch_arrow_table()
+            """,
+                [category],
+            ).fetch_arrow_table()
         )
 
     def get_all_transactions(self) -> pl.DataFrame:
         """Retrieve all transactions from database."""
-        return pl.from_arrow(
-            self.conn.execute("""
+        return pl.from_arrow(self.conn.execute("""
                 SELECT * FROM transactions ORDER BY date DESC
-            """).fetch_arrow_table()
-        )
+            """).fetch_arrow_table())
 
     def get_category_summary(self) -> Dict[str, float]:
         """Get total amount by category."""
@@ -473,7 +535,7 @@ class TransactionDatabase:
             "months": [row[0] for row in rows],
             "net_amounts": [float(row[1] or 0.0) for row in rows],
             "inflows": [float(row[2] or 0.0) for row in rows],
-            "outflows": [float(row[3] or 0.0) for row in rows]
+            "outflows": [float(row[3] or 0.0) for row in rows],
         }
 
     def get_database_stats(self) -> Dict[str, Any]:
@@ -492,21 +554,21 @@ class TransactionDatabase:
 
         category_summary = self.get_category_summary()
         monthly_trends = self.get_monthly_trends()
-        
+
         return {
             "total_transactions": stats[0],
             "unique_files": stats[1],
             "unique_categories": stats[2],
             "date_range": {
                 "start": str(stats[3]) if stats[3] else None,
-                "end": str(stats[4]) if stats[4] else None
+                "end": str(stats[4]) if stats[4] else None,
             },
             "totals": {
                 "inflow": float(stats[5]) if stats[5] else 0.0,
-                "outflow": float(stats[6]) if stats[6] else 0.0
+                "outflow": float(stats[6]) if stats[6] else 0.0,
             },
             "category_summary": category_summary,
-            "monthly_trends": monthly_trends
+            "monthly_trends": monthly_trends,
         }
 
     def get_files_info(self) -> List[Dict[str, Any]]:
@@ -523,47 +585,48 @@ class TransactionDatabase:
             GROUP BY file_source, file_hash
             ORDER BY uploaded_at DESC
         """).fetchall()
-        
+
         return [
             {
                 "filename": f[0],
                 "file_hash": f[1],
                 "date_range": {"start": str(f[2]), "end": str(f[3])},
                 "transaction_count": f[4],
-                "uploaded_at": str(f[5])
+                "uploaded_at": str(f[5]),
             }
             for f in files
         ]
 
     def get_payee_mapping(self, payee: str) -> Optional[Dict[str, Any]]:
         """Get existing category mapping for a payee."""
-        row = self.conn.execute("""
+        row = self.conn.execute(
+            """
             SELECT category, category_group, confidence
             FROM payee_mappings
             WHERE payee = ?
             ORDER BY created_at DESC
             LIMIT 1
-        """, [payee]).fetchone()
+        """,
+            [payee],
+        ).fetchone()
 
         if row:
-            return {
-                "category": row[0],
-                "category_group": row[1],
-                "confidence": row[2]
-            }
+            return {"category": row[0], "category_group": row[1], "confidence": row[2]}
         return None
 
     def save_payee_mapping(self, payee: str, category: str, category_group: str, confidence: float):
         """Save a new payee to category mapping."""
-        self.conn.execute("""
+        self.conn.execute(
+            """
             INSERT INTO payee_mappings (payee, category, category_group, confidence, created_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT (payee, category) DO UPDATE SET
                 category_group = EXCLUDED.category_group,
                 confidence = EXCLUDED.confidence,
                 created_at = EXCLUDED.created_at
-        """, [payee, category, category_group, confidence])
-
+        """,
+            [payee, category, category_group, confidence],
+        )
 
     def get_all_categories(self) -> List[str]:
         """Get list of all unique category names."""

@@ -17,15 +17,16 @@ class TransactionAnalyzer:
         cleaned = (
             pl.col(column)
             .cast(pl.Utf8)
-            .str.replace_all("$", "")
-            .str.replace_all(",", "")
+            .str.replace_all("$", "", literal=True)
+            .str.replace_all(",", "", literal=True)
             .str.strip_chars()
         )
 
         return df.with_columns(
-            pl.when(cleaned == "")
+            pl.when((cleaned == "") | (cleaned.is_null()))
             .then(0.0)
-            .otherwise(cleaned.cast(pl.Float64))
+            .otherwise(cleaned.cast(pl.Float64, strict=False))
+            .fill_null(0.0)
             .alias(column)
         )
 
@@ -53,10 +54,7 @@ class TransactionAnalyzer:
 
         if date_col:
             df = df.with_columns(
-                pl.col(date_col)
-                .cast(pl.Utf8)
-                .str.strptime(pl.Date, strict=False)
-                .alias("date")
+                pl.col(date_col).cast(pl.Utf8).str.strptime(pl.Date, strict=False).alias("date")
             )
         else:
             raise ValueError(f"CSV must contain a date column. Available columns: {df.columns}")
@@ -89,10 +87,7 @@ class TransactionAnalyzer:
             )
         elif "category" in df.columns:
             df = df.with_columns(
-                pl.col("category")
-                .fill_null("Uncategorized")
-                .cast(pl.Utf8)
-                .alias("category")
+                pl.col("category").fill_null("Uncategorized").cast(pl.Utf8).alias("category")
             )
         else:
             df = df.with_columns(
@@ -102,21 +97,29 @@ class TransactionAnalyzer:
 
         if "category" in df.columns and "category_group" not in df.columns:
             df = df.with_columns(
-                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category")
+                .str.split("|")
+                .list.get(0)
+                .str.strip_chars()
+                .alias("category_group"),
                 pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
         elif "category group/category" in df.columns:
             df = df.with_columns(
-                pl.col("category").str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                pl.col("category")
+                .str.split("|")
+                .list.get(0)
+                .str.strip_chars()
+                .alias("category_group"),
                 pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
             )
 
         df = df.with_columns(
             pl.when(pl.col("inflow") > pl.col("outflow"))
-             .then(pl.lit("income"))
+            .then(pl.lit("income"))
             .when(pl.col("outflow") > pl.col("inflow"))
-             .then(pl.lit("expense"))
-             .otherwise(pl.lit("transfer"))
+            .then(pl.lit("expense"))
+            .otherwise(pl.lit("transfer"))
             .alias("transaction_type"),
             pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
         )
@@ -169,15 +172,12 @@ class TransactionAnalyzer:
         months = sorted(category_monthly["month_str"].unique().to_list())
         categories = sorted(category_monthly["category"].unique().to_list())
 
-        pivot = (
-            category_monthly.pivot(
-                values="outflow",
-                index="month_str",
-                columns="category",
-                aggregate_function="sum",
-            )
-            .fill_null(0.0)
-        )
+        pivot = category_monthly.pivot(
+            values="outflow",
+            index="month_str",
+            columns="category",
+            aggregate_function="sum",
+        ).fill_null(0.0)
 
         result = {"months": months, "categories": categories, "data": {}}
         for category in categories:
@@ -216,14 +216,11 @@ class TransactionAnalyzer:
 
         total_inflow = float(df["inflow"].sum() or 0.0)
         total_outflow = float(df["outflow"].sum() or 0.0)
-        monthly = (
-            df.group_by("month_str")
-            .agg(
-                [
-                    pl.col("inflow").sum().alias("monthly_inflow"),
-                    pl.col("outflow").sum().alias("monthly_outflow"),
-                ]
-            )
+        monthly = df.group_by("month_str").agg(
+            [
+                pl.col("inflow").sum().alias("monthly_inflow"),
+                pl.col("outflow").sum().alias("monthly_outflow"),
+            ]
         )
 
         avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
