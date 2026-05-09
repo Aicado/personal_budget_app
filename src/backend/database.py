@@ -329,34 +329,55 @@ class TransactionDatabase:
                 nest_asyncio.apply()
 
                 llm_mappings = {}
-                for row in unique_uncat_payees:
+
+                # Ensure an event loop exists before creating loop-bound objects like Semaphores
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                semaphore = asyncio.Semaphore(10)
+
+                async def process_payee(row, categories_snapshot):
                     payee = row["payee"]
-                    try:
-                        # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
+                    async with semaphore:
                         try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row["amount"], str(row["date"]), all_categories
+                            llm_result = await categorizer.categorize_transaction(
+                                payee, row["amount"], str(row["date"]), categories_snapshot
                             )
-                        )
+                            return payee, llm_result
+                        except Exception as e:
+                            print(f"LLM Categorization failed for {payee}: {e}")
+                            return payee, None
 
+                # Create tasks for all unique payees
+                # Use a snapshot of categories for all parallel tasks to avoid race conditions
+                categories_snapshot = list(all_categories)
+                tasks = [process_payee(row, categories_snapshot) for row in unique_uncat_payees]
+
+                # Execute all LLM calls in parallel with a concurrency limit
+                results = loop.run_until_complete(asyncio.gather(*tasks))
+
+                for payee, llm_result in results:
+                    try:
                         if llm_result:
                             llm_mappings[payee] = {
                                 "category": llm_result["category"],
                                 "category_group": llm_result["category_group"]
                             }
                             # Save mapping for future
-                            self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
+                            self.save_payee_mapping(
+                                payee,
+                                llm_result["category"],
+                                llm_result["category_group"],
+                                llm_result["confidence"]
+                            )
+                            # Add to known categories for subsequent processing if needed
                             if llm_result["category"] not in all_categories:
                                 all_categories.append(llm_result["category"])
                     except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
+                        print(f"Error processing LLM result for {payee}: {e}")
 
                 # Apply LLM mappings back to the main dataframe
                 if llm_mappings:

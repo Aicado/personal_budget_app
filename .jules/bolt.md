@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Vectorized Ingestion vs Row-by-row Mapping]
 **Learning:** Vectorizing Polars ingestion and using a single SQL query with `QUALIFY ROW_NUMBER()` to fetch unique mappings significantly outperforms row-by-row loops and repeated SQL calls during data ingestion. This reduced ingestion overhead by ~75%.
 **Action:** Always prefer vectorized joins for mapping operations in ingestion pipelines and deduplicate external service calls (like LLM) by grouping unique keys.
+
+## 2024-05-16 - [Asyncio Semaphore and Event Loop Initialization]
+**Learning:** Instantiating loop-bound objects like `asyncio.Semaphore` before ensuring an event loop exists causes a `RuntimeError` in environments where a loop isn't automatically started (common when bridging sync and async code).
+**Action:** Always acquire or create the event loop via `asyncio.get_event_loop()` or `asyncio.new_event_loop()` before instantiating semaphores or other synchronization primitives.
