@@ -30,7 +30,10 @@ export const IncomeExpenseTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchCategoryData()
+    const loadData = async () => {
+      await fetchCategoryData()
+    }
+    loadData()
   }, [])
 
   const totalIncome = Object.values(categoryData).reduce((sum, val) => {
