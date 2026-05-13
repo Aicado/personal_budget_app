@@ -324,39 +324,54 @@ class TransactionDatabase:
                     pl.col("date").first()
                 ]).to_dicts()
 
+                llm_mappings = {}
                 # Pre-apply nest_asyncio once if needed
                 import nest_asyncio
                 nest_asyncio.apply()
 
-                llm_mappings = {}
-                for row in unique_uncat_payees:
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # Semaphore to limit concurrency and avoid overwhelming the LLM service
+                semaphore = asyncio.Semaphore(10)
+                # Take a snapshot of categories to avoid mutation issues during parallel calls
+                categories_snapshot = list(all_categories)
+
+                async def process_payee(row):
                     payee = row["payee"]
-                    try:
-                        # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
+                    async with semaphore:
                         try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row["amount"], str(row["date"]), all_categories
+                            llm_result = await categorizer.categorize_transaction(
+                                payee, row["amount"], str(row["date"]), categories_snapshot
                             )
-                        )
+                            return payee, llm_result
+                        except Exception as e:
+                            print(f"LLM Categorization failed for {payee}: {e}")
+                            return payee, None
 
-                        if llm_result:
-                            llm_mappings[payee] = {
-                                "category": llm_result["category"],
-                                "category_group": llm_result["category_group"]
-                            }
-                            # Save mapping for future
-                            self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
-                            if llm_result["category"] not in all_categories:
-                                all_categories.append(llm_result["category"])
-                    except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
+                # Parallelize LLM calls
+                tasks = [process_payee(row) for row in unique_uncat_payees]
+                results = loop.run_until_complete(asyncio.gather(*tasks))
+
+                for payee, llm_result in results:
+                    if llm_result:
+                        llm_mappings[payee] = {
+                            "category": llm_result["category"],
+                            "category_group": llm_result["category_group"]
+                        }
+                        # Save mapping for future
+                        self.save_payee_mapping(
+                            payee,
+                            llm_result["category"],
+                            llm_result["category_group"],
+                            llm_result["confidence"],
+                        )
+                        # Update master list for persistence across batches
+                        if llm_result["category"] not in all_categories:
+                            all_categories.append(llm_result["category"])
 
                 # Apply LLM mappings back to the main dataframe
                 if llm_mappings:
