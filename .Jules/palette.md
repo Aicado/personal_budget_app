@@ -9,3 +9,7 @@
 ## 2025-05-17 - [Data Visualization Accessibility]
 **Learning:** For static data visualizations representing a measurement within a known range (e.g., spending categories), `role="meter"` is more semantic than `role="progressbar"`. Adding `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, and a descriptive `aria-label` ensures these visual elements are accessible to screen reader users.
 **Action:** Use `role="meter"` for static visualizations and `role="progressbar"` for ongoing tasks. Always provide quantitative values via ARIA attributes and a clear text label.
+
+## 2025-05-20 - [Text Contrast Accessibility]
+**Learning:** Text colors like #7f8c8d on white backgrounds provide insufficient contrast (4.02:1). Adhere to WCAG AA standards by using colors with at least a 4.5:1 ratio, such as #65758a, for normal text visibility.
+**Action:** Always verify contrast ratios for secondary text colors using tools like WebAIM Contrast Checker before implementation.
