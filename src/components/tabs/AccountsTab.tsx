@@ -165,6 +165,11 @@ export const AccountsTab: React.FC = () => {
             {filteredAccounts.length === 0 ? (
               <div className="no-data">
                 <p>No accounts found matching the selected filter.</p>
+                {filter !== 'all' && (
+                  <button className="btn btn-secondary" onClick={() => setFilter('all')}>
+                    Show All Accounts
+                  </button>
+                )}
               </div>
             ) : (
               filteredAccounts.map((account, idx) => (
