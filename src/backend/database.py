@@ -2,7 +2,9 @@
 
 import asyncio
 import duckdb
+import httpx
 import io
+import nest_asyncio
 import polars as pl
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -325,38 +327,52 @@ class TransactionDatabase:
                 ]).to_dicts()
 
                 # Pre-apply nest_asyncio once if needed
-                import nest_asyncio
                 nest_asyncio.apply()
 
+                async def process_batch():
+                    # Limit concurrency to avoid overwhelming local LLM
+                    semaphore = asyncio.Semaphore(10)
+                    current_cats = list(all_categories)
+
+                    async def process_payee(client, row):
+                        payee = row["payee"]
+                        async with semaphore:
+                            try:
+                                # Use shared client for performance
+                                result = await categorizer.categorize_transaction(
+                                    payee, row["amount"], str(row["date"]), current_cats, client=client
+                                )
+                                return payee, result
+                            except Exception as e:
+                                print(f"LLM Categorization failed for {payee}: {e}")
+                                return payee, None
+
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        tasks = [process_payee(client, row) for row in unique_uncat_payees]
+                        return await asyncio.gather(*tasks)
+
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                batch_results = loop.run_until_complete(process_batch())
+
                 llm_mappings = {}
-                for row in unique_uncat_payees:
-                    payee = row["payee"]
-                    try:
-                        # Call LLM (wrapped in asyncio since we are in a sync method often called by async ones)
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                        llm_result = loop.run_until_complete(
-                            categorizer.categorize_transaction(
-                                payee, row["amount"], str(row["date"]), all_categories
-                            )
+                for payee, llm_result in batch_results:
+                    if llm_result:
+                        llm_mappings[payee] = {
+                            "category": llm_result["category"],
+                            "category_group": llm_result["category_group"]
+                        }
+                        # Save mapping for future
+                        self.save_payee_mapping(
+                            payee,
+                            llm_result["category"],
+                            llm_result["category_group"],
+                            llm_result["confidence"]
                         )
-
-                        if llm_result:
-                            llm_mappings[payee] = {
-                                "category": llm_result["category"],
-                                "category_group": llm_result["category_group"]
-                            }
-                            # Save mapping for future
-                            self.save_payee_mapping(payee, llm_result["category"], llm_result["category_group"], llm_result["confidence"])
-                            # Add to known categories to help LLM stay consistent
-                            if llm_result["category"] not in all_categories:
-                                all_categories.append(llm_result["category"])
-                    except Exception as e:
-                        print(f"LLM Categorization failed for {payee}: {e}")
 
                 # Apply LLM mappings back to the main dataframe
                 if llm_mappings:

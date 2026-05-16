@@ -18,7 +18,8 @@ class LLMCategorizer:
         payee: str,
         amount: float,
         date: str,
-        existing_categories: List[str]
+        existing_categories: List[str],
+        client: Optional[httpx.AsyncClient] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Send a transaction to Ollama for categorization.
@@ -27,40 +28,52 @@ class LLMCategorizer:
         prompt = self._build_prompt(payee, amount, date, existing_categories)
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.api_url,
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "format": "json"
+            # Reuse provided client or create a temporary one
+            if client is None:
+                async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                    response = await self._send_request(temp_client, prompt)
+            else:
+                response = await self._send_request(client, prompt)
+
+            if response is None:
+                return None
+
+            result = response.json()
+            response_text = result.get("response", "{}")
+
+            try:
+                category_data = json.loads(response_text)
+                # Basic validation of expected keys
+                if "category" in category_data and "category_group" in category_data:
+                    return {
+                        "category": category_data["category"],
+                        "category_group": category_data["category_group"],
+                        "confidence": category_data.get("confidence", 0.5)
                     }
-                )
-
-                if response.status_code != 200:
-                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                    return None
-
-                result = response.json()
-                response_text = result.get("response", "{}")
-
-                try:
-                    category_data = json.loads(response_text)
-                    # Basic validation of expected keys
-                    if "category" in category_data and "category_group" in category_data:
-                        return {
-                            "category": category_data["category"],
-                            "category_group": category_data["category_group"],
-                            "confidence": category_data.get("confidence", 0.5)
-                        }
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to parse LLM response as JSON: {response_text}")
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse LLM response as JSON: {response_text}")
 
         except Exception as e:
             logger.error(f"Error calling LLM service: {e}")
 
         return None
+
+    async def _send_request(self, client: httpx.AsyncClient, prompt: str) -> Optional[httpx.Response]:
+        """Internal helper to send request using provided client."""
+        response = await client.post(
+            self.api_url,
+            json={
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json"
+            }
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+            return None
+        return response
 
     def _build_prompt(self, payee: str, amount: float, date: str, existing_categories: List[str]) -> str:
         categories_str = ", ".join(existing_categories)
