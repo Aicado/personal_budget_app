@@ -98,11 +98,12 @@ export const AccountsTab: React.FC = () => {
             {loading && <span className="spinner" aria-hidden="true"></span>}
             {loading ? 'Loading...' : 'Refresh Accounts'}
           </button>
-          <div className="accounts-filter">
+          <div className="accounts-filter" role="group" aria-label="Filter accounts">
             <button
               className={`btn btn-secondary ${filter === 'all' ? 'active-filter' : ''}`}
               onClick={() => setFilter('all')}
               disabled={loading}
+              aria-pressed={filter === 'all'}
             >
               All Accounts
             </button>
@@ -110,6 +111,7 @@ export const AccountsTab: React.FC = () => {
               className={`btn btn-secondary ${filter === 'needs-data' ? 'active-filter' : ''}`}
               onClick={() => setFilter('needs-data')}
               disabled={loading}
+              aria-pressed={filter === 'needs-data'}
             >
               Needs Data ({needsDataCount})
             </button>
@@ -165,6 +167,13 @@ export const AccountsTab: React.FC = () => {
             {filteredAccounts.length === 0 ? (
               <div className="no-data">
                 <p>No accounts found matching the selected filter.</p>
+                {filter !== 'all' && (
+                  <div className="no-data-action">
+                    <button className="btn btn-secondary" onClick={() => setFilter('all')}>
+                      Show all accounts
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               filteredAccounts.map((account, idx) => (
