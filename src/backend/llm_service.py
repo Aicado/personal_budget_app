@@ -18,7 +18,8 @@ class LLMCategorizer:
         payee: str,
         amount: float,
         date: str,
-        existing_categories: List[str]
+        existing_categories: List[str],
+        client: Optional[httpx.AsyncClient] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Send a transaction to Ollama for categorization.
@@ -27,38 +28,51 @@ class LLMCategorizer:
         prompt = self._build_prompt(payee, amount, date, existing_categories)
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.api_url,
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "format": "json"
-                    }
-                )
-
-                if response.status_code != 200:
-                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                    return None
-
-                result = response.json()
-                response_text = result.get("response", "{}")
-
-                try:
-                    category_data = json.loads(response_text)
-                    # Basic validation of expected keys
-                    if "category" in category_data and "category_group" in category_data:
-                        return {
-                            "category": category_data["category"],
-                            "category_group": category_data["category_group"],
-                            "confidence": category_data.get("confidence", 0.5)
-                        }
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to parse LLM response as JSON: {response_text}")
+            # Use provided client or create a temporary one (though shared client is preferred for performance)
+            if client is None:
+                async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                    return await self._do_categorize(temp_client, prompt)
+            else:
+                return await self._do_categorize(client, prompt)
 
         except Exception as e:
             logger.error(f"Error calling LLM service: {e}")
+
+        return None
+
+    async def _do_categorize(self, client: httpx.AsyncClient, prompt: str) -> Optional[Dict[str, Any]]:
+        """Helper to perform the actual HTTP call."""
+        try:
+            response = await client.post(
+                self.api_url,
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json"
+                }
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+                return None
+
+            result = response.json()
+            response_text = result.get("response", "{}")
+
+            try:
+                category_data = json.loads(response_text)
+                # Basic validation of expected keys
+                if "category" in category_data and "category_group" in category_data:
+                    return {
+                        "category": category_data["category"],
+                        "category_group": category_data["category_group"],
+                        "confidence": category_data.get("confidence", 0.5)
+                    }
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse LLM response as JSON: {response_text}")
+        except Exception as e:
+            logger.error(f"Error during LLM request: {e}")
 
         return None
 
