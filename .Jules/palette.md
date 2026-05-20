@@ -13,3 +13,7 @@
 ## 2025-05-17 - [Data Visualization Accessibility]
 **Learning:** For static data visualizations representing a measurement within a known range (e.g., spending categories), `role="meter"` is more semantic than `role="progressbar"`. Adding `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, and a descriptive `aria-label` ensures these visual elements are accessible to screen reader users.
 **Action:** Use `role="meter"` for static visualizations and `role="progressbar"` for ongoing tasks. Always provide quantitative values via ARIA attributes and a clear text label.
+
+## 2025-05-18 - [Contrast and Contextual UI]
+**Learning:** Text colors like #7f8c8d on white backgrounds often fail WCAG AA contrast standards (4.02:1). Also, showing "Data Needed" summary alerts when a "Needs Data" filter is already active creates redundant UI noise.
+**Action:** Use #65758a for secondary text to ensure >4.5:1 contrast. Conditionally hide summary sections when the user has already applied a filter that targets that exact state to improve clarity.
