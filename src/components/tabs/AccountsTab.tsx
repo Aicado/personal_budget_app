@@ -98,11 +98,12 @@ export const AccountsTab: React.FC = () => {
             {loading && <span className="spinner" aria-hidden="true"></span>}
             {loading ? 'Loading...' : 'Refresh Accounts'}
           </button>
-          <div className="accounts-filter">
+          <div className="accounts-filter" role="group" aria-label="Filter accounts">
             <button
               className={`btn btn-secondary ${filter === 'all' ? 'active-filter' : ''}`}
               onClick={() => setFilter('all')}
               disabled={loading}
+              aria-pressed={filter === 'all'}
             >
               All Accounts
             </button>
@@ -110,6 +111,7 @@ export const AccountsTab: React.FC = () => {
               className={`btn btn-secondary ${filter === 'needs-data' ? 'active-filter' : ''}`}
               onClick={() => setFilter('needs-data')}
               disabled={loading}
+              aria-pressed={filter === 'needs-data'}
             >
               Needs Data ({needsDataCount})
             </button>
@@ -138,28 +140,30 @@ export const AccountsTab: React.FC = () => {
             </div>
           </div>
 
-          <div className="needs-data-section">
-            <div className="needs-data-header">
-              <h3>Data needed</h3>
-              <p>Accounts below still require either transaction history or a current balance file.</p>
+          {filter !== 'needs-data' && (
+            <div className="needs-data-section">
+              <div className="needs-data-header">
+                <h3>Data needed</h3>
+                <p>Accounts below still require either transaction history or a current balance file.</p>
+              </div>
+              {needsDataCount > 0 ? (
+                <div className="needs-data-list">
+                  {accountsNeedingData.map((account, idx) => (
+                    <div key={idx} className="needs-data-item">
+                      <span>{account.name}</span>
+                      <span className={`needs-data-tag ${account.needs_transactions ? 'needs-transactions' : 'needs-balance'}`}>
+                        {account.needs_transactions ? 'Transactions missing' : 'Balance missing'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="all-loaded-message">
+                  All accounts have the required transaction and balance data loaded.
+                </div>
+              )}
             </div>
-            {needsDataCount > 0 ? (
-              <div className="needs-data-list">
-                {accountsNeedingData.map((account, idx) => (
-                  <div key={idx} className="needs-data-item">
-                    <span>{account.name}</span>
-                    <span className={`needs-data-tag ${account.needs_transactions ? 'needs-transactions' : 'needs-balance'}`}>
-                      {account.needs_transactions ? 'Transactions missing' : 'Balance missing'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="all-loaded-message">
-                All accounts have the required transaction and balance data loaded.
-              </div>
-            )}
-          </div>
+          )}
 
           <div className="accounts-grid">
             {filteredAccounts.length === 0 ? (
