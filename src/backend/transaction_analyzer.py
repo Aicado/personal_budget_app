@@ -14,18 +14,16 @@ class TransactionAnalyzer:
         if column not in df.columns:
             return df.with_columns(pl.lit(0.0).alias(column))
 
-        cleaned = (
+        # Use literal=True to avoid regex overhead and correctly handle $
+        # Use strict=False with fill_null for a single-pass vectorized cleaning
+        return df.with_columns(
             pl.col(column)
             .cast(pl.Utf8)
-            .str.replace_all("$", "")
-            .str.replace_all(",", "")
+            .str.replace_all("$", "", literal=True)
+            .str.replace_all(",", "", literal=True)
             .str.strip_chars()
-        )
-
-        return df.with_columns(
-            pl.when(cleaned == "")
-            .then(0.0)
-            .otherwise(cleaned.cast(pl.Float64))
+            .cast(pl.Float64, strict=False)
+            .fill_null(0.0)
             .alias(column)
         )
 
