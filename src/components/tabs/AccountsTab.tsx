@@ -53,7 +53,10 @@ export const AccountsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchAccounts()
+    const init = async () => {
+      await fetchAccounts()
+    }
+    init()
   }, [])
 
   const toggleAccountExpansion = async (accountName: string) => {
@@ -129,16 +132,18 @@ export const AccountsTab: React.FC = () => {
         <div className="loading">Loading accounts...</div>
       ) : (
         <>
-          <div className="accounts-summary">
-            <div className="summary-item">
-              <span>Total Accounts</span>
-              <strong>{accounts.length}</strong>
+          {filter !== 'needs-data' && (
+            <div className="accounts-summary">
+              <div className="summary-item">
+                <span>Total Accounts</span>
+                <strong>{accounts.length}</strong>
+              </div>
+              <div className="summary-item">
+                <span>Accounts needing data</span>
+                <strong>{needsDataCount}</strong>
+              </div>
             </div>
-            <div className="summary-item">
-              <span>Accounts needing data</span>
-              <strong>{needsDataCount}</strong>
-            </div>
-          </div>
+          )}
 
           {filter !== 'needs-data' && (
             <div className="needs-data-section">
@@ -159,7 +164,7 @@ export const AccountsTab: React.FC = () => {
                 </div>
               ) : (
                 <div className="all-loaded-message">
-                  All accounts have the required transaction and balance data loaded.
+                  <span aria-hidden="true">🎉</span> All accounts have the required transaction and balance data loaded.
                 </div>
               )}
             </div>

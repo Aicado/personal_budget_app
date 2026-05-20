@@ -576,7 +576,7 @@
 
 .needs-balance {
   background: rgba(241, 196, 15, 0.15);
-  color: #b7950b;
+  color: #856404;
 }
 
 .all-loaded-message {
@@ -584,7 +584,7 @@
   background: #eef9f3;
   border: 1px solid #d4efdf;
   border-radius: 10px;
-  color: #27ae60;
+  color: #1e8449;
 }
 
 .status-badge {
