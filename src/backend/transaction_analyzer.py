@@ -204,40 +204,42 @@ class TransactionAnalyzer:
 
         return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
 
-    def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, float]:
-        """Get summary statistics."""
+    def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
+        """Get summary statistics using a single-pass vectorized aggregation."""
         if df is None:
             df = self.df
 
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        total_inflow = float(df["inflow"].sum() or 0.0)
-        total_outflow = float(df["outflow"].sum() or 0.0)
-        monthly = (
-            df.group_by("month_str")
-            .agg(
-                [
-                    pl.col("inflow").sum().alias("monthly_inflow"),
-                    pl.col("outflow").sum().alias("monthly_outflow"),
-                ]
-            )
-        )
+        # Single-pass aggregation for all metrics to avoid redundant scanning and expensive group-bys.
+        # This replaces multiple individual column calls and the group-by/mean pattern with one scan.
+        stats = df.select([
+            pl.col("inflow").sum().alias("total_inflow"),
+            pl.col("outflow").sum().alias("total_outflow"),
+            pl.col("month_str").n_unique().alias("n_months"),
+            pl.col("category").n_unique().alias("unique_categories"),
+            pl.col("date").min().alias("start_date"),
+            pl.col("date").max().alias("end_date"),
+            pl.len().alias("transaction_count")
+        ])
 
-        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
-        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+        row = stats.to_dicts()[0]
+        total_inflow = row["total_inflow"] or 0.0
+        total_outflow = row["total_outflow"] or 0.0
+        n_months = row["n_months"] or 1
 
         return {
             "total_inflow": round(total_inflow, 2),
             "total_outflow": round(total_outflow, 2),
             "net_total": round(total_inflow - total_outflow, 2),
-            "avg_monthly_inflow": round(avg_monthly_inflow, 2),
-            "avg_monthly_outflow": round(avg_monthly_outflow, 2),
-            "transaction_count": df.height,
-            "unique_categories": int(df["category"].n_unique()),
+            "avg_monthly_inflow": round(total_inflow / n_months, 2),
+            "avg_monthly_outflow": round(total_outflow / n_months, 2),
+            "transaction_count": row["transaction_count"],
+            "unique_categories": row["unique_categories"],
             "date_range": {
-                "start": str(df["date"].min()),
-                "end": str(df["date"].max()),
+                "start": str(row["start_date"]),
+                "end": str(row["end_date"]),
             },
         }
 

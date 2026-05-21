@@ -93,6 +93,14 @@ class TransactionDatabase:
         except Exception:
             pass  # Index already exists
         
+        # Create index on account for account-specific queries
+        try:
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_account ON transactions(account)
+            """)
+        except Exception:
+            pass  # Index already exists
+
         # Create index on date for range queries
         try:
             self.conn.execute("""

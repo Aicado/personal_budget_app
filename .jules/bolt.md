@@ -13,3 +13,11 @@
 ## 2025-05-17 - [Vectorized Try-Cast vs Conditional Branching]
 **Learning:** In Polars, cleaning currency strings using `pl.when().then().otherwise()` evaluates the cleaning expression twice. Replacing this with a single-pass `.cast(pl.Float64, strict=False).fill_null(0.0)` improves performance by ~2.6x. Additionally, `str.replace_all("$", "")` interprets `$` as a regex anchor (end-of-line) unless `literal=True` is used, which was causing a parsing bug for leading dollar signs.
 **Action:** Always use `literal=True` for literal string replacements in Polars and prefer `strict=False` casts with `fill_null` for high-performance data cleaning.
+
+## 2025-05-18 - [Single-Pass Aggregation vs Multi-Pass Scanning]
+**Learning:** In Polars, performing multiple individual column aggregations (e.g., `df['col'].sum()`) and separate `group_by` operations for means results in redundant scans of the dataset. Refactoring these into a single `df.select([...])` with multiple expressions allows Polars to execute all aggregations in a single vectorized pass.
+**Action:** Always group related aggregations into a single `df.select()` or `df.group_by().agg()` to minimize data scanning overhead.
+
+## 2025-05-18 - [Account Indexing for UI Performance]
+**Learning:** Frequent UI-driven queries that filter by a specific column (like `account`) suffer from O(n) table scans in DuckDB as the transaction volume grows. Adding a standard B-tree index on these high-cardinality filter columns reduces query time from linear to logarithmic.
+**Action:** Identify primary filter columns in the UI (e.g., `account`, `category`) and ensure they are indexed in the database schema.
