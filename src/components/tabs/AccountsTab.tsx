@@ -33,6 +33,7 @@ export const AccountsTab: React.FC = () => {
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({})
   const [loading, setLoading] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchAccounts = async () => {
@@ -45,6 +46,7 @@ export const AccountsTab: React.FC = () => {
       }
       const data = await response.json()
       setAccounts(data.accounts || [])
+      setLastUpdated(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -53,7 +55,10 @@ export const AccountsTab: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchAccounts()
+    const init = async () => {
+      await fetchAccounts()
+    }
+    init()
   }, [])
 
   const toggleAccountExpansion = async (accountName: string) => {
@@ -94,10 +99,17 @@ export const AccountsTab: React.FC = () => {
         <h2><span aria-hidden="true">💳</span> Accounts</h2>
         <p>View all accounts and their transaction summary</p>
         <div className="accounts-header-actions">
-          <button className="btn btn-primary" onClick={fetchAccounts} disabled={loading}>
-            {loading && <span className="spinner" aria-hidden="true"></span>}
-            {loading ? 'Loading...' : 'Refresh Accounts'}
-          </button>
+          <div className="refresh-container">
+            <button className="btn btn-primary" onClick={fetchAccounts} disabled={loading}>
+              {loading && <span className="spinner" aria-hidden="true"></span>}
+              {loading ? 'Refreshing...' : 'Refresh Accounts'}
+            </button>
+            {lastUpdated && (
+              <span className="last-updated" aria-live="polite">
+                Last updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
           <div className="accounts-filter" role="group" aria-label="Filter accounts">
             <button
               className={`btn btn-secondary ${filter === 'all' ? 'active-filter' : ''}`}
@@ -172,7 +184,7 @@ export const AccountsTab: React.FC = () => {
               </div>
             ) : (
               filteredAccounts.map((account, idx) => (
-                <div key={idx} className={`account-card ${account.needs_current_balance || account.needs_transactions ? 'needs-data' : ''}`}>
+                <div key={idx} className="account-card">
                   <div className="account-header">
                     <h3>{account.name}</h3>
                     <div className="account-header-actions">

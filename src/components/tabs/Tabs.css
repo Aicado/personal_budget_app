@@ -479,8 +479,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
   justify-content: space-between;
+}
+
+.refresh-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.last-updated {
+  font-size: 0.85rem;
+  color: #65758a;
+  font-weight: 500;
 }
 
 .accounts-filter {
