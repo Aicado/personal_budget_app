@@ -32,6 +32,7 @@ export const AccountsTab: React.FC = () => {
   const [filter, setFilter] = useState<FilterType>('all')
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({})
+  const [fetchingAccounts, setFetchingAccounts] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,6 +54,7 @@ export const AccountsTab: React.FC = () => {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAccounts()
   }, [])
 
@@ -60,26 +62,34 @@ export const AccountsTab: React.FC = () => {
     const newExpanded = new Set(expandedAccounts)
     if (newExpanded.has(accountName)) {
       newExpanded.delete(accountName)
+      setExpandedAccounts(newExpanded)
     } else {
-      newExpanded.add(accountName)
       // Fetch transactions if not already loaded
       if (!accountTransactions[accountName]) {
+        setFetchingAccounts((prev) => new Set(prev).add(accountName))
         try {
           const encodedName = encodeURIComponent(accountName)
           const response = await fetch(`http://localhost:8000/accounts/${encodedName}/transactions`)
           if (response.ok) {
             const data = await response.json()
-            setAccountTransactions(prev => ({
+            setAccountTransactions((prev) => ({
               ...prev,
-              [accountName]: data.transactions || []
+              [accountName]: data.transactions || [],
             }))
           }
         } catch (err) {
           console.error('Failed to fetch transactions:', err)
+        } finally {
+          setFetchingAccounts((prev) => {
+            const next = new Set(prev)
+            next.delete(accountName)
+            return next
+          })
         }
       }
+      newExpanded.add(accountName)
+      setExpandedAccounts(newExpanded)
     }
-    setExpandedAccounts(newExpanded)
   }
 
   const accountsNeedingData = accounts.filter((account) => account.needs_current_balance || account.needs_transactions)
@@ -189,8 +199,17 @@ export const AccountsTab: React.FC = () => {
                           onClick={() => toggleAccountExpansion(account.name)}
                           aria-expanded={expandedAccounts.has(account.name)}
                           aria-controls={`transactions-${account.name.replace(/\s+/g, '-').toLowerCase()}`}
+                          disabled={fetchingAccounts.has(account.name)}
                         >
-                          {expandedAccounts.has(account.name) ? 'Collapse' : 'Expand'} Transactions
+                          {fetchingAccounts.has(account.name) && (
+                            <span className="spinner" aria-hidden="true"></span>
+                          )}
+                          {fetchingAccounts.has(account.name)
+                            ? 'Loading...'
+                            : expandedAccounts.has(account.name)
+                            ? 'Collapse'
+                            : 'Expand'}{' '}
+                          Transactions
                         </button>
                       )}
                     </div>
@@ -224,7 +243,12 @@ export const AccountsTab: React.FC = () => {
                   {expandedAccounts.has(account.name) && accountTransactions[account.name] && (
                     <div className="account-transactions" id={`transactions-${account.name.replace(/\s+/g, '-').toLowerCase()}`}>
                       <h4>Recent Transactions</h4>
-                      <div className="transactions-table-container">
+                      <div
+                        className="transactions-table-container"
+                        tabIndex={0}
+                        role="region"
+                        aria-label={`Recent transactions for ${account.name}`}
+                      >
                         <table className="transactions-table">
                           <thead>
                             <tr>

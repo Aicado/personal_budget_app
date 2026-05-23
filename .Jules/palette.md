@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Contrast and Contextual UI]
 **Learning:** Text colors like #7f8c8d on white backgrounds often fail WCAG AA contrast standards (4.02:1). Also, showing "Data Needed" summary alerts when a "Needs Data" filter is already active creates redundant UI noise.
 **Action:** Use #65758a for secondary text to ensure >4.5:1 contrast. Conditionally hide summary sections when the user has already applied a filter that targets that exact state to improve clarity.
+
+## 2026-05-23 - [Interactive List Accessibility and Feedback]
+**Learning:** Scrollable containers for data (like transaction tables) must be explicitly focusable via `tabIndex={0}` and labeled with `role="region"` and `aria-label` to be navigable by keyboard users. Additionally, asynchronous actions within lists (like expanding an item that requires a fetch) should provide per-item visual feedback (loading spinners) and disable the specific trigger to prevent redundant requests and clarify state.
+**Action:** Always wrap scrollable data regions with appropriate ARIA roles and labels. Ensure every async interaction has a corresponding loading state and disabled state on its trigger.
