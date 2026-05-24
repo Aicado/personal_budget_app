@@ -169,23 +169,27 @@ class TransactionAnalyzer:
 
         pivot = (
             category_monthly.pivot(
-                values="outflow",
+                on="category",
                 index="month_str",
-                columns="category",
+                values="outflow",
                 aggregate_function="sum",
             )
             .fill_null(0.0)
         )
 
-        result = {"months": months, "categories": categories, "data": {}}
-        for category in categories:
-            result["data"][category] = (
-                pivot[category].round(2).to_list()
-                if category in pivot.columns
-                else [0.0] * len(months)
-            )
+        # Use Polars to_dict(as_series=False) for a vectorized conversion to a dictionary of lists.
+        # This is significantly faster than a Python-level loop over columns.
+        # We use a list comprehension to build the selection expressions to ensure all categories
+        # are present in the output, even if they have no transactions in the given period.
+        data = (
+            pivot.select([
+                pl.col(cat).round(2) if cat in pivot.columns else pl.repeat(0.0, pivot.height).alias(cat)
+                for cat in categories
+            ])
+            .to_dict(as_series=False)
+        )
 
-        return result
+        return {"months": months, "categories": categories, "data": data}
 
     def get_category_totals(self, df: pl.DataFrame | None = None) -> Dict[str, float]:
         """Get total spending by category."""
