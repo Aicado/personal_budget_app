@@ -9,7 +9,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.backend.database import TransactionDatabase
 
-def setup_benchmark_db(db_path, num_accounts=1000, num_transactions=100000):
+def setup_benchmark_db(db_path, num_accounts=1000, num_transactions=1000000):
     if os.path.exists(db_path):
         os.remove(db_path)
 

@@ -204,16 +204,26 @@ class TransactionAnalyzer:
 
         return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
 
-    def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, float]:
-        """Get summary statistics."""
+    def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
+        """Get summary statistics using a single-pass vectorized aggregation for performance."""
         if df is None:
             df = self.df
 
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        total_inflow = float(df["inflow"].sum() or 0.0)
-        total_outflow = float(df["outflow"].sum() or 0.0)
+        # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        stats = df.select([
+            pl.col("inflow").sum().alias("total_inflow"),
+            pl.col("outflow").sum().alias("total_outflow"),
+            pl.col("category").n_unique().alias("unique_categories"),
+            pl.col("date").min().alias("min_date"),
+            pl.col("date").max().alias("max_date"),
+        ]).to_dicts()[0]
+
+        total_inflow = float(stats["total_inflow"] or 0.0)
+        total_outflow = float(stats["total_outflow"] or 0.0)
+
         monthly = (
             df.group_by("month_str")
             .agg(
@@ -234,10 +244,10 @@ class TransactionAnalyzer:
             "avg_monthly_inflow": round(avg_monthly_inflow, 2),
             "avg_monthly_outflow": round(avg_monthly_outflow, 2),
             "transaction_count": df.height,
-            "unique_categories": int(df["category"].n_unique()),
+            "unique_categories": int(stats["unique_categories"]),
             "date_range": {
-                "start": str(df["date"].min()),
-                "end": str(df["date"].max()),
+                "start": str(stats["min_date"]),
+                "end": str(stats["max_date"]),
             },
         }
 
