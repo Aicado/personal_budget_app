@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2026-05-25 - [Interactive Summary Tiles as Filters]
+**Learning:** Summary tiles that display counts (e.g., "Accounts needing data") are often perceived as interactive by users. Transforming these from static indicators into filters using `role="button"` and appropriate keyboard support (`tabIndex`, Enter/Space handlers) provides a more intuitive way to explore data than separate filter dropdowns or buttons.
+**Action:** When a summary statistic directly corresponds to a filterable state, implement it as an interactive element with clear focus states and ARIA roles to facilitate "click-to-filter" behavior.

@@ -144,11 +144,37 @@ export const AccountsTab: React.FC = () => {
       ) : (
         <>
           <div className="accounts-summary">
-            <div className="summary-item">
+            <div
+              className={`summary-item ${filter === 'all' ? 'active-summary' : ''}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setFilter('all')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setFilter('all')
+                }
+              }}
+              aria-label={`Filter by all accounts: ${accounts.length} total`}
+              aria-pressed={filter === 'all'}
+            >
               <span>Total Accounts</span>
               <strong>{accounts.length}</strong>
             </div>
-            <div className="summary-item">
+            <div
+              className={`summary-item ${filter === 'needs-data' ? 'active-summary' : ''}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setFilter('needs-data')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setFilter('needs-data')
+                }
+              }}
+              aria-label={`Filter by accounts needing data: ${needsDataCount} remaining`}
+              aria-pressed={filter === 'needs-data'}
+            >
               <span>Accounts needing data</span>
               <strong>{needsDataCount}</strong>
             </div>
@@ -183,6 +209,11 @@ export const AccountsTab: React.FC = () => {
             {filteredAccounts.length === 0 ? (
               <div className="no-data">
                 <p>No accounts found matching the selected filter.</p>
+                {filter !== 'all' && (
+                  <button className="btn btn-secondary" onClick={() => setFilter('all')}>
+                    Show all accounts
+                  </button>
+                )}
               </div>
             ) : (
               filteredAccounts.map((account, idx) => (

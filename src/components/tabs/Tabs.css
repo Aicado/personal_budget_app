@@ -509,13 +509,36 @@
 
 .summary-item {
   background: #f8f9fa;
-  border: 1px solid #ecf0f1;
+  border: 2px solid #ecf0f1;
   border-radius: 10px;
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  transition: all 0.3s ease;
+}
+
+.summary-item[role='button'] {
+  cursor: pointer;
+}
+
+.summary-item[role='button']:hover {
+  border-color: #667eea;
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.summary-item[role='button']:focus-visible {
+  outline: 3px solid #667eea;
+  outline-offset: 2px;
+}
+
+.summary-item.active-summary {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+  box-shadow: inset 0 0 0 1px #667eea;
 }
 
 .summary-item strong {
