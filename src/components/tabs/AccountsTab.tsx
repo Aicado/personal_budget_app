@@ -130,7 +130,7 @@ export const AccountsTab: React.FC = () => {
       </div>
 
       {error && (
-        <div className="error-message">
+        <div className="error-message" role="alert">
           {error}
         </div>
       )}

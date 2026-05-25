@@ -17,7 +17,7 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
 
   return (
     <div className="category-breakdown">
-      <h2>Top Spending Categories</h2>
+      <h3>Top Spending Categories</h3>
       <div className="categories-list">
         {sortedCategories.map(([category, amount]) => {
           const percentage = (amount / total) * 100

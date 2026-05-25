@@ -19,6 +19,9 @@ function App() {
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <header className="app-header">
         <div className="header-content">
           <h1>
@@ -48,7 +51,7 @@ function App() {
           ))}
         </nav>
 
-        <main className="app-main">
+        <main className="app-main" id="main-content">
           <div
             key={activeTab}
             id={`panel-${activeTab}`}
