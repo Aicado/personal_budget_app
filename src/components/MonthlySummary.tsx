@@ -16,7 +16,7 @@ export function MonthlySummary({ months, inflows, outflows, netAmounts }: Monthl
 
   return (
     <div className="monthly-summary">
-      <h2>Monthly Trends</h2>
+      <h3>Monthly Trends</h3>
       <div className="summary-container">
         {months.map((month, index) => (
           <div key={month} className="month-card">
