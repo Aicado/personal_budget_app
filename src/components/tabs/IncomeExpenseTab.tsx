@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { CategoryBreakdown } from '../CategoryBreakdown'
 import './Tabs.css'
 
@@ -30,16 +30,16 @@ export const IncomeExpenseTab: React.FC = () => {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCategoryData()
   }, [])
 
-  const totalIncome = Object.values(categoryData).reduce((sum, val) => {
-    return sum + (val > 0 ? val : 0)
-  }, 0)
-
-  const totalExpense = Object.values(categoryData).reduce((sum, val) => {
-    return sum + (val < 0 ? Math.abs(val) : 0)
-  }, 0)
+  const { totalIncome, totalExpense } = useMemo(() => {
+    const values = Object.values(categoryData)
+    const income = values.reduce((sum, val) => sum + (val > 0 ? val : 0), 0)
+    const expense = values.reduce((sum, val) => sum + (val < 0 ? Math.abs(val) : 0), 0)
+    return { totalIncome: income, totalExpense: expense }
+  }, [categoryData])
 
   return (
     <div className="income-expense-tab">
