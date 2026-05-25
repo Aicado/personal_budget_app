@@ -20,7 +20,7 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders data after loading', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as vi.Mock).mockResolvedValue({
       ok: true,
       json: async () => mockData
     })
@@ -38,7 +38,7 @@ describe('SpendingTrendsTab', () => {
   })
 
   it('renders error message on fetch failure', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as vi.Mock).mockResolvedValue({
       ok: false
     })
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { MonthlySummary } from '../MonthlySummary'
 import './Tabs.css'
 
@@ -13,6 +13,18 @@ export const SpendingTrendsTab: React.FC = () => {
   const [trendsData, setTrendsData] = useState<MonthlyTrend | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const averages = useMemo(() => {
+    if (!trendsData) return { avgInflow: 0, avgOutflow: 0, avgNet: 0 }
+    const inflowLen = trendsData.inflows.length || 1
+    const outflowLen = trendsData.outflows.length || 1
+    const netLen = trendsData.net_amounts.length || 1
+    return {
+      avgInflow: trendsData.inflows.reduce((a, b) => a + b, 0) / inflowLen,
+      avgOutflow: trendsData.outflows.reduce((a, b) => a + b, 0) / outflowLen,
+      avgNet: trendsData.net_amounts.reduce((a, b) => a + b, 0) / netLen,
+    }
+  }, [trendsData])
 
   const fetchTrendsData = async () => {
     setLoading(true)
@@ -39,6 +51,7 @@ export const SpendingTrendsTab: React.FC = () => {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTrendsData()
   }, [])
 
@@ -66,21 +79,15 @@ export const SpendingTrendsTab: React.FC = () => {
           <div className="trends-summary">
             <div className="trend-card">
               <div className="trend-label">Average Monthly Income</div>
-              <div className="trend-value value-positive">
-                ${(trendsData.inflows.reduce((a, b) => a + b, 0) / trendsData.inflows.length).toFixed(2)}
-              </div>
+              <div className="trend-value value-positive">${averages.avgInflow.toFixed(2)}</div>
             </div>
             <div className="trend-card">
               <div className="trend-label">Average Monthly Spending</div>
-              <div className="trend-value value-negative">
-                ${(trendsData.outflows.reduce((a, b) => a + b, 0) / trendsData.outflows.length).toFixed(2)}
-              </div>
+              <div className="trend-value value-negative">${averages.avgOutflow.toFixed(2)}</div>
             </div>
             <div className="trend-card">
               <div className="trend-label">Average Net Monthly</div>
-              <div className="trend-value value-positive">
-                ${(trendsData.net_amounts.reduce((a, b) => a + b, 0) / trendsData.net_amounts.length).toFixed(2)}
-              </div>
+              <div className="trend-value value-positive">${averages.avgNet.toFixed(2)}</div>
             </div>
           </div>
 

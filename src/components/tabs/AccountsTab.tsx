@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import './Tabs.css'
 
 interface AccountInfo {
@@ -92,11 +92,15 @@ export const AccountsTab: React.FC = () => {
     }
   }
 
-  const accountsNeedingData = accounts.filter((account) => account.needs_current_balance || account.needs_transactions)
+  const accountsNeedingData = useMemo(
+    () => accounts.filter((account) => account.needs_current_balance || account.needs_transactions),
+    [accounts]
+  )
   const needsDataCount = accountsNeedingData.length
-  const filteredAccounts = filter === 'needs-data'
-    ? accountsNeedingData
-    : accounts
+  const filteredAccounts = useMemo(
+    () => (filter === 'needs-data' ? accountsNeedingData : accounts),
+    [filter, accounts, accountsNeedingData]
+  )
 
   return (
     <div className="accounts-tab">
