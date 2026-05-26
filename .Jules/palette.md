@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Data Magnitude and Keyboard Navigation]
+**Learning:** Backend numerical conventions (e.g., negative values for expenses) must be explicitly handled in UI visualizations using absolute values (`Math.abs()`) for sorting and progress bar scaling to ensure intuitive representation. Additionally, any scrollable data container must be focusable (`tabIndex={0}`) and explicitly labeled (`role="region"`) to be accessible to keyboard-only users.
+**Action:** Always verify how the backend represents signed data before implementing visualization logic. Ensure all `overflow: auto` containers in the UI are keyboard-navigable and semantically labeled.

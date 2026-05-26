@@ -97,26 +97,33 @@ export const NetWorthTab: React.FC = () => {
 
           <div className="net-worth-table">
             <h3>Account Balances</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Account Name</th>
-                  <th>Type</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {balanceData.accounts.map((account, idx) => (
-                  <tr key={idx}>
-                    <td>{account.name}</td>
-                    <td>{account.type}</td>
-                    <td className={account.balance >= 0 ? 'value-positive' : 'value-negative'}>
-                      ${account.balance.toFixed(2)}
-                    </td>
+            <div
+              className="transactions-table-container"
+              tabIndex={0}
+              role="region"
+              aria-label="Account balances table"
+            >
+              <table className="transactions-table">
+                <thead>
+                  <tr>
+                    <th>Account Name</th>
+                    <th>Type</th>
+                    <th>Balance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {balanceData.accounts.map((account, idx) => (
+                    <tr key={idx}>
+                      <td>{account.name}</td>
+                      <td>{account.type}</td>
+                      <td className={account.balance >= 0 ? 'value-positive' : 'value-negative'}>
+                        ${account.balance.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       ) : (
