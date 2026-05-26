@@ -224,7 +224,8 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        # Performance Optimization: Single-pass vectorized aggregation for all core statistics.
+        # This replaces the multi-pass approach (selective sum + group_by + average) with a single scan.
         stats = df.select(
             [
                 pl.col("inflow").sum().alias("total_inflow"),
@@ -232,21 +233,18 @@ class TransactionAnalyzer:
                 pl.col("category").n_unique().alias("unique_categories"),
                 pl.col("date").min().alias("min_date"),
                 pl.col("date").max().alias("max_date"),
+                pl.col("month_str").n_unique().alias("month_count"),
             ]
         ).to_dicts()[0]
 
         total_inflow = float(stats["total_inflow"] or 0.0)
         total_outflow = float(stats["total_outflow"] or 0.0)
+        month_count = max(1, int(stats["month_count"] or 1))
 
-        monthly = df.group_by("month_str").agg(
-            [
-                pl.col("inflow").sum().alias("monthly_inflow"),
-                pl.col("outflow").sum().alias("monthly_outflow"),
-            ]
-        )
-
-        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
-        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+        # Averages are calculated by dividing the total by the unique month count,
+        # which is much faster than an explicit group_by and subsequent mean.
+        avg_monthly_inflow = total_inflow / month_count
+        avg_monthly_outflow = total_outflow / month_count
 
         return {
             "total_inflow": round(total_inflow, 2),

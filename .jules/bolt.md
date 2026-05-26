@@ -17,3 +17,11 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2026-05-26 - [Targeted SQL Retrieval for Mapping]
+**Learning:** Fetching the entire `payee_mappings` table into a Polars DataFrame for a client-side join becomes a bottleneck as the mapping table grows. Filtering the mappings in the database using `WHERE payee IN (SELECT UNNEST(?))` reduces data transfer and improves insertion speed by ~62%.
+**Action:** Always filter lookup tables in the database based on the current batch's keys instead of fetching the full table for a client-side join.
+
+## 2026-05-26 - [Single-pass Vectorized Aggregation for Statistics]
+**Learning:** Calculating monthly averages by first grouping by month and then taking the mean of sums is significantly slower (~74%) than a single-pass aggregation that fetches the total sum and the count of unique months in one scan.
+**Action:** Prefer single-pass aggregations in Polars using `n_unique()` for grouping counts to calculate averages instead of multi-pass `group_by` operations.

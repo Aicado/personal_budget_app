@@ -328,14 +328,20 @@ class TransactionDatabase:
         if "month_str" not in df.columns:
             df = df.with_columns(pl.col("date").dt.strftime("%Y-%m").alias("month_str"))
 
-        # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries
-        # Use GROUP BY to ensure unique payees for the join, taking the most recent mapping
+        # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries.
+        # Performance: Only fetch mappings for payees that are actually in the current batch.
+        # This avoids a full table scan and reduces data transfer when the mapping table is large.
+        unique_payees_in_batch = df["payee"].unique().to_list()
         mappings_df = pl.from_arrow(
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 SELECT payee, category, category_group
                 FROM payee_mappings
+                WHERE payee IN (SELECT UNNEST(?))
                 QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
-            """).fetch_arrow_table()
+            """,
+                [unique_payees_in_batch],
+            ).fetch_arrow_table()
         )
 
         if not mappings_df.is_empty():
