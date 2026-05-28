@@ -59,9 +59,16 @@
 }
 
 .category-bar {
-  background: linear-gradient(90deg, #9b59b6, #8e44ad);
   height: 100%;
   transition: width 0.3s ease;
+}
+
+.category-bar.income {
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.category-bar.expense {
+  background: linear-gradient(90deg, #9b59b6, #8e44ad);
 }
 
 .category-percentage {

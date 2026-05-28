@@ -12,12 +12,12 @@ describe('CategoryBreakdown', () => {
   it('renders category totals correctly', () => {
     render(<CategoryBreakdown categoryTotals={mockTotals} />)
 
-    expect(screen.getByText('Top Spending Categories')).toBeInTheDocument()
+    expect(screen.getByText('Top Categories')).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('$500.00')).toBeInTheDocument()
     expect(screen.getByText('Rent')).toBeInTheDocument()
     expect(screen.getByText('$1500.00')).toBeInTheDocument()
-    expect(screen.getByText('Total Spending:')).toBeInTheDocument()
+    expect(screen.getByText('Net Total:')).toBeInTheDocument()
     expect(screen.getByText('$2200.00')).toBeInTheDocument()
   })
 

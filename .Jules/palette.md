@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Visualizing Signed Financial Data]
+**Learning:** Financial visualizations (like category bars) often break when encountering negative values (expenses) if they assume positive magnitudes for CSS widths. Using `Math.abs()` for visual scaling while distinguishing direction through semantic colors (green for income, purple for expense) and explicit ARIA labels (e.g., "Food expense") provides a robust and intuitive experience.
+**Action:** Always use absolute magnitudes for visualization dimensions and quantitative ARIA attributes. Use color and text labels to explicitly communicate the sign/direction of the data.
