@@ -17,3 +17,15 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2025-05-19 - [Payee Mapping Filtered Lookup]
+**Learning:** In transaction ingestion, fetching all unique payee mappings from DuckDB creates a scalability bottleneck. Filtering the lookup query to only include payees present in the current batch (using WHERE payee IN (SELECT UNNEST(?))) combined with a database index on the payee column ensures that mapping performance remains high regardless of history size.
+**Action:** Always filter metadata lookups by batch keys and index the lookup column to maintain ingestion speed as the database scales.
+
+## 2025-05-19 - [DuckDB Grouping Sets vs Separate Queries]
+**Learning:** For multi-level aggregations (e.g., stats, category totals, and monthly trends), using a single SQL query with GROUPING SETS was ~3.5x slower than executing three focused queries in this DuckDB/FastAPI environment (0.024s vs 0.085s). The overhead of complex grouping logic in a single pass exceeded the cost of multiple scans on this dataset.
+**Action:** Measure single-pass complex queries against multiple simple queries in DuckDB; columnar stores often favor multiple simple scans over complex branching logic.
+
+## 2025-05-19 - [Indexing Columnar Aggregations]
+**Learning:** Adding traditional B-Tree indexes on columns used primarily for grouping (like month_year or category) in DuckDB's columnar format can significantly degrade performance (e.g., 0.02s -> 0.8s for aggregation). DuckDB's zone maps and vectorized execution are already highly optimized for these scans.
+**Action:** Avoid indexing columns used mainly for GROUP BY in DuckDB unless specific range or point lookups are the primary bottleneck, as the index overhead often outweighs the scan benefits.
