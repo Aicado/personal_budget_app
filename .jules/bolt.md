@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2025-05-19 - [Payee Mapping Lookup Scalability]
+**Learning:** Loading the entire `payee_mappings` table for every transaction ingestion batch creates a significant bottleneck as history scales (e.g., ~276ms for a small batch with 500k mappings). Filtering the lookup query to only include payees present in the current batch (`WHERE payee IN (SELECT UNNEST(?))`) combined with an index on the `payee` column reduces this overhead by ~80% (~55ms).
+**Action:** Always filter metadata lookups (like payee-to-category mappings) by the keys present in the current processing batch and ensure these keys are indexed in the database.

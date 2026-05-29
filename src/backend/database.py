@@ -84,6 +84,14 @@ class TransactionDatabase:
             )
         """)
 
+        # Create index on payee_mappings for efficient categorization lookups
+        try:
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_payee_mappings_payee ON payee_mappings(payee)
+            """)
+        except Exception:
+            pass
+
         # Create index on file_hash for duplicate detection
         try:
             self.conn.execute("""
@@ -323,19 +331,27 @@ class TransactionDatabase:
             )
         if "payee" not in df.columns:
             df = df.with_columns(pl.lit("").alias("payee"))
+        else:
+            # Ensure payee column is robust for joining
+            df = df.with_columns(pl.col("payee").fill_null("").cast(pl.Utf8))
+
         if "description" not in df.columns:
             df = df.with_columns(pl.lit("").alias("description"))
         if "month_str" not in df.columns:
             df = df.with_columns(pl.col("date").dt.strftime("%Y-%m").alias("month_str"))
 
+        # Identify unique payees in this batch to filter mapping lookup
+        unique_payees = df["payee"].unique().to_list()
+
         # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries
-        # Use GROUP BY to ensure unique payees for the join, taking the most recent mapping
+        # Filter by payees in current batch for performance
         mappings_df = pl.from_arrow(
             self.conn.execute("""
                 SELECT payee, category, category_group
                 FROM payee_mappings
+                WHERE payee IN (SELECT UNNEST(?))
                 QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
-            """).fetch_arrow_table()
+            """, [unique_payees]).fetch_arrow_table()
         )
 
         if not mappings_df.is_empty():
