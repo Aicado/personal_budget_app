@@ -328,14 +328,20 @@ class TransactionDatabase:
         if "month_str" not in df.columns:
             df = df.with_columns(pl.col("date").dt.strftime("%Y-%m").alias("month_str"))
 
-        # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries
-        # Use GROUP BY to ensure unique payees for the join, taking the most recent mapping
+        # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries.
+        # Filtering to only include payees from the current batch avoids loading the entire table.
+        # Use QUALIFY to ensure unique payees for the join, taking the most recent mapping.
+        unique_payees = df.select(pl.col("payee").fill_null("")).unique()["payee"].to_list()
         mappings_df = pl.from_arrow(
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 SELECT payee, category, category_group
                 FROM payee_mappings
+                WHERE payee IN (SELECT UNNEST(?))
                 QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
-            """).fetch_arrow_table()
+            """,
+                [unique_payees],
+            ).fetch_arrow_table()
         )
 
         if not mappings_df.is_empty():
@@ -528,11 +534,9 @@ class TransactionDatabase:
 
     def get_all_transactions(self) -> pl.DataFrame:
         """Retrieve all transactions from database."""
-        return pl.from_arrow(
-            self.conn.execute("""
+        return pl.from_arrow(self.conn.execute("""
                 SELECT * FROM transactions ORDER BY date DESC
-            """).fetch_arrow_table()
-        )
+            """).fetch_arrow_table())
 
     def get_category_summary(self) -> Dict[str, float]:
         """Get total amount by category."""
