@@ -34,11 +34,19 @@ export const IncomeExpenseTab: React.FC = () => {
     fetchCategoryData()
   }, [])
 
-  const { totalIncome, totalExpense } = useMemo(() => {
-    const values = Object.values(categoryData)
-    const income = values.reduce((sum, val) => sum + (val > 0 ? val : 0), 0)
-    const expense = values.reduce((sum, val) => sum + (val < 0 ? Math.abs(val) : 0), 0)
-    return { totalIncome: income, totalExpense: expense }
+  const { totalIncome, totalExpense, expenseOnlyData } = useMemo(() => {
+    const values = Object.entries(categoryData)
+    const income = values.reduce((sum, [, val]) => sum + (val > 0 ? val : 0), 0)
+    const expense = values.reduce((sum, [, val]) => sum + (val < 0 ? Math.abs(val) : 0), 0)
+
+    const expenseOnly: CategoryData = {}
+    values.forEach(([cat, val]) => {
+      if (val < 0) {
+        expenseOnly[cat] = Math.abs(val)
+      }
+    })
+
+    return { totalIncome: income, totalExpense: expense, expenseOnlyData: expenseOnly }
   }, [categoryData])
 
   return (
@@ -85,7 +93,7 @@ export const IncomeExpenseTab: React.FC = () => {
 
           <div className="category-breakdown-container">
             <h3>By Category</h3>
-            <CategoryBreakdown categoryTotals={categoryData} />
+            <CategoryBreakdown categoryTotals={expenseOnlyData} />
           </div>
         </>
       )}
