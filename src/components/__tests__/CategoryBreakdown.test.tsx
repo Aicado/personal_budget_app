@@ -17,7 +17,7 @@ describe('CategoryBreakdown', () => {
     expect(screen.getByText('$500.00')).toBeInTheDocument()
     expect(screen.getByText('Rent')).toBeInTheDocument()
     expect(screen.getByText('$1500.00')).toBeInTheDocument()
-    expect(screen.getByText('Total Spending:')).toBeInTheDocument()
+    expect(screen.getByText('Total Volume:')).toBeInTheDocument()
     expect(screen.getByText('$2200.00')).toBeInTheDocument()
   })
 
