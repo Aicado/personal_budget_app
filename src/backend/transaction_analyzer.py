@@ -190,9 +190,11 @@ class TransactionAnalyzer:
         # are present in the output, even if they have no transactions in the given period.
         data = pivot.select(
             [
-                pl.col(cat).round(2)
-                if cat in pivot.columns
-                else pl.repeat(0.0, pivot.height).alias(cat)
+                (
+                    pl.col(cat).round(2)
+                    if cat in pivot.columns
+                    else pl.repeat(0.0, pivot.height).alias(cat)
+                )
                 for cat in categories
             ]
         ).to_dict(as_series=False)
@@ -224,7 +226,8 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        # Single-pass aggregation for all stats to avoid scanning the same columns multiple times
+        # Counting unique month_str allows us to calculate averages without a separate group_by
         stats = df.select(
             [
                 pl.col("inflow").sum().alias("total_inflow"),
@@ -232,21 +235,18 @@ class TransactionAnalyzer:
                 pl.col("category").n_unique().alias("unique_categories"),
                 pl.col("date").min().alias("min_date"),
                 pl.col("date").max().alias("max_date"),
+                pl.col("month_str").n_unique().alias("n_months"),
             ]
-        ).to_dicts()[0]
+        ).row(0, named=True)
 
         total_inflow = float(stats["total_inflow"] or 0.0)
         total_outflow = float(stats["total_outflow"] or 0.0)
+        # Use a minimum of 1 month to avoid division by zero
+        n_months = stats["n_months"] or 1
 
-        monthly = df.group_by("month_str").agg(
-            [
-                pl.col("inflow").sum().alias("monthly_inflow"),
-                pl.col("outflow").sum().alias("monthly_outflow"),
-            ]
-        )
-
-        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
-        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+        # Calculate averages from totals and month count - much faster than group_by + mean
+        avg_monthly_inflow = total_inflow / n_months
+        avg_monthly_outflow = total_outflow / n_months
 
         return {
             "total_inflow": round(total_inflow, 2),
