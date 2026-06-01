@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Accessible Financial Data Visualization]
+**Learning:** For mixed financial data (income/expenses), segmenting the data into distinct views improves clarity. In visualizations like category bars, using absolute values for sorting and magnitude calculation ensures that the highest-impact items (regardless of sign) are most prominent. Semantic `<ul>`/`<li>` structures for these lists improve screen reader navigation compared to generic `div` soup.
+**Action:** Filter signed data into logical groups (e.g., income/expense) for display. Use absolute magnitudes for sorting/sizing. Use semantic lists for data breakdowns and ensure text contrast (e.g., `#5e6d81` on white) meets the 4.5:1 ratio for WCAG AA.
