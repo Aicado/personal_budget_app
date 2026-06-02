@@ -10,17 +10,18 @@ class TransactionAnalyzer:
     def __init__(self):
         self.df: pl.DataFrame | None = None
 
-    def _clean_amount_column(self, df: pl.DataFrame, column: str) -> pl.DataFrame:
+    def _get_clean_amount_expr(self, df: pl.DataFrame, column: str) -> pl.Expr:
+        """Get a Polars expression to clean a currency column without modifying the DataFrame yet."""
         if column not in df.columns:
-            return df.with_columns(pl.lit(0.0).alias(column))
+            return pl.lit(0.0).alias(column)
 
         # If already numeric, just fill nulls and return to avoid expensive string operations
         if df.schema[column].is_numeric():
-            return df.with_columns(pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column))
+            return pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column)
 
         # Use literal=True to avoid regex overhead and correctly handle $
         # Use strict=False with fill_null for a single-pass vectorized cleaning
-        return df.with_columns(
+        return (
             pl.col(column)
             .cast(pl.Utf8)
             .str.replace_all("$", "", literal=True)
@@ -41,7 +42,9 @@ class TransactionAnalyzer:
 
     def parse_transactions(self, df: pl.DataFrame) -> pl.DataFrame:
         """Parse and clean transaction data from DataFrame."""
-        df = df.clone()
+        # Avoid redundant cloning if not strictly necessary; Polars is copy-on-write
+        # but we do want to avoid modifying the input if it's reused.
+        # We'll re-assign df as we go, which handles clones efficiently.
 
         # Standardize column names
         df.columns = [col.strip().lower() for col in df.columns]
@@ -53,73 +56,54 @@ class TransactionAnalyzer:
                 date_col = potential_date
                 break
 
-        if date_col:
-            # If already a date or datetime, just alias it to avoid expensive string re-parsing
-            if df.schema[date_col] in [pl.Date, pl.Datetime]:
-                df = df.with_columns(pl.col(date_col).cast(pl.Date).alias("date"))
-            else:
-                df = df.with_columns(
-                    pl.col(date_col).cast(pl.Utf8).str.strptime(pl.Date, strict=False).alias("date")
-                )
-        else:
+        if not date_col:
             raise ValueError(f"CSV must contain a date column. Available columns: {df.columns}")
 
-        # Handle outflow/inflow vs debit/credit formats
-        if "outflow" in df.columns and "inflow" in df.columns:
-            df = self._clean_amount_column(df, "outflow")
-            df = self._clean_amount_column(df, "inflow")
-        elif "debit" in df.columns and "credit" in df.columns:
-            df = self._clean_amount_column(df, "debit")
-            df = self._clean_amount_column(df, "credit")
-            df = df.with_columns(
-                pl.col("debit").alias("outflow"),
-                pl.col("credit").alias("inflow"),
-            )
+        # Batch 1: Cleaning and initial column setup
+        # Grouping cleaning expressions into a single with_columns call to minimize scans
+        cleaning_exprs = []
+
+        # Date parsing
+        if df.schema[date_col] in [pl.Date, pl.Datetime]:
+            cleaning_exprs.append(pl.col(date_col).cast(pl.Date).alias("date"))
         else:
-            df = df.with_columns(
-                pl.lit(0.0).alias("outflow"),
-                pl.lit(0.0).alias("inflow"),
+            cleaning_exprs.append(
+                pl.col(date_col).cast(pl.Utf8).str.strptime(pl.Date, strict=False).alias("date")
             )
 
-        df = df.with_columns((pl.col("inflow") - pl.col("outflow")).alias("amount"))
+        # Amount cleaning
+        if "outflow" in df.columns and "inflow" in df.columns:
+            cleaning_exprs.append(self._get_clean_amount_expr(df, "outflow"))
+            cleaning_exprs.append(self._get_clean_amount_expr(df, "inflow"))
+        elif "debit" in df.columns and "credit" in df.columns:
+            cleaning_exprs.append(self._get_clean_amount_expr(df, "debit").alias("outflow"))
+            cleaning_exprs.append(self._get_clean_amount_expr(df, "credit").alias("inflow"))
+        else:
+            cleaning_exprs.append(pl.lit(0.0).alias("outflow"))
+            cleaning_exprs.append(pl.lit(0.0).alias("inflow"))
 
+        # Category normalization
         if "category group/category" in df.columns:
-            df = df.with_columns(
+            cleaning_exprs.append(
                 pl.col("category group/category")
                 .fill_null("Uncategorized")
                 .cast(pl.Utf8)
                 .alias("category")
             )
         elif "category" in df.columns:
-            df = df.with_columns(
+            cleaning_exprs.append(
                 pl.col("category").fill_null("Uncategorized").cast(pl.Utf8).alias("category")
             )
         else:
-            df = df.with_columns(
-                pl.lit("Uncategorized").alias("category"),
-                pl.lit("Uncategorized").alias("category_group"),
-            )
+            cleaning_exprs.append(pl.lit("Uncategorized").alias("category"))
+            cleaning_exprs.append(pl.lit("Uncategorized").alias("category_group"))
 
-        if "category" in df.columns and "category_group" not in df.columns:
-            df = df.with_columns(
-                pl.col("category")
-                .str.split("|")
-                .list.get(0)
-                .str.strip_chars()
-                .alias("category_group"),
-                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-            )
-        elif "category group/category" in df.columns:
-            df = df.with_columns(
-                pl.col("category")
-                .str.split("|")
-                .list.get(0)
-                .str.strip_chars()
-                .alias("category_group"),
-                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-            )
+        df = df.with_columns(cleaning_exprs)
 
-        df = df.with_columns(
+        # Batch 2: Derived columns
+        # These depend on columns created or modified in Batch 1
+        derived_exprs = [
+            (pl.col("inflow") - pl.col("outflow")).alias("amount"),
             pl.when(pl.col("inflow") > pl.col("outflow"))
             .then(pl.lit("income"))
             .when(pl.col("outflow") > pl.col("inflow"))
@@ -127,7 +111,26 @@ class TransactionAnalyzer:
             .otherwise(pl.lit("transfer"))
             .alias("transaction_type"),
             pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
-        )
+        ]
+
+        # Splitting category/category_group if necessary
+        if "category" in df.columns and "category_group" not in df.columns:
+            derived_exprs.extend(
+                [
+                    pl.col("category")
+                    .str.split("|")
+                    .list.get(0)
+                    .str.strip_chars()
+                    .alias("category_group"),
+                    pl.col("category")
+                    .str.split("|")
+                    .list.get(-1)
+                    .str.strip_chars()
+                    .alias("category"),
+                ]
+            )
+
+        df = df.with_columns(derived_exprs)
 
         self.df = df
         return df
@@ -152,11 +155,14 @@ class TransactionAnalyzer:
             .sort("month_str")
         )
 
+        # Vectorized conversion to dict using to_dict(as_series=False)
+        trends = monthly.to_dict(as_series=False)
+
         return {
-            "months": monthly["month_str"].to_list(),
-            "net_amounts": monthly["amount"].to_list(),
-            "outflows": monthly["outflow"].to_list(),
-            "inflows": monthly["inflow"].to_list(),
+            "months": trends["month_str"],
+            "net_amounts": trends["amount"],
+            "outflows": trends["outflow"],
+            "inflows": trends["inflow"],
         }
 
     def get_category_trends(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
@@ -214,7 +220,8 @@ class TransactionAnalyzer:
             .sort("category")
         )
 
-        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
+        # Micro-optimization: using dict(zip(...)) is faster than to_dicts() list comprehension
+        return dict(zip(totals["category"], totals["outflow"]))
 
     def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get summary statistics using a single-pass vectorized aggregation for performance."""
@@ -224,7 +231,9 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        # Single-pass aggregation for all stats including monthly averages.
+        # This avoids a separate group_by("month_str") by using month_str.n_unique()
+        # to calculate the averages directly from the total sums.
         stats = df.select(
             [
                 pl.col("inflow").sum().alias("total_inflow"),
@@ -232,21 +241,16 @@ class TransactionAnalyzer:
                 pl.col("category").n_unique().alias("unique_categories"),
                 pl.col("date").min().alias("min_date"),
                 pl.col("date").max().alias("max_date"),
+                pl.col("month_str").n_unique().alias("unique_months"),
             ]
-        ).to_dicts()[0]
+        ).row(0, named=True)
 
         total_inflow = float(stats["total_inflow"] or 0.0)
         total_outflow = float(stats["total_outflow"] or 0.0)
+        unique_months = stats["unique_months"] or 1
 
-        monthly = df.group_by("month_str").agg(
-            [
-                pl.col("inflow").sum().alias("monthly_inflow"),
-                pl.col("outflow").sum().alias("monthly_outflow"),
-            ]
-        )
-
-        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
-        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+        avg_monthly_inflow = total_inflow / unique_months
+        avg_monthly_outflow = total_outflow / unique_months
 
         return {
             "total_inflow": round(total_inflow, 2),

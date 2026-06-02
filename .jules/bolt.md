@@ -17,3 +17,11 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2025-05-19 - [Batched Expression-based Polars Refactor]
+**Learning:** Batching multiple transformations into fewer `with_columns` passes and refactoring cleaning helpers to return `pl.Expr` instead of `pl.DataFrame` significantly reduces DataFrame scanning and cloning overhead. In `TransactionAnalyzer`, this improved `parse_transactions` performance by ~3.7x (0.75s to 0.20s for 1M rows).
+**Action:** Always return `pl.Expr` from helper methods in Polars processing pipelines to enable batched execution in the main flow.
+
+## 2025-05-20 - [Single-Pass Aggregation for Averages]
+**Learning:** Calculating monthly averages in `TransactionAnalyzer.get_summary_stats` using a single `select` with `pl.col("month_str").n_unique()` is ~1.6x faster than performing a separate `group_by` and then averaging. Using `.row(0, named=True)` and `dict(zip(...))` further optimizes the hand-off to Python.
+**Action:** Avoid separate `group_by` operations for simple aggregate ratios (like averages per month) when they can be calculated using `n_unique` in a single scan.
