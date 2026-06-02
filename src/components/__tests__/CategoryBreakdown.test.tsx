@@ -10,19 +10,19 @@ describe('CategoryBreakdown', () => {
   }
 
   it('renders category totals correctly', () => {
-    render(<CategoryBreakdown categoryTotals={mockTotals} />)
+    render(<CategoryBreakdown categoryTotals={mockTotals} title="Top Spending Categories" />)
 
     expect(screen.getByText('Top Spending Categories')).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('$500.00')).toBeInTheDocument()
     expect(screen.getByText('Rent')).toBeInTheDocument()
     expect(screen.getByText('$1500.00')).toBeInTheDocument()
-    expect(screen.getByText('Total Spending:')).toBeInTheDocument()
+    expect(screen.getByText('Magnitude Total:')).toBeInTheDocument()
     expect(screen.getByText('$2200.00')).toBeInTheDocument()
   })
 
   it('returns null when no categories provided', () => {
-    const { container } = render(<CategoryBreakdown categoryTotals={{}} />)
+    const { container } = render(<CategoryBreakdown categoryTotals={{}} title="Test Title" />)
     expect(container.firstChild).toBeNull()
   })
 })

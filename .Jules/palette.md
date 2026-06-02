@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-06-02 - [Magnitude-Based Financial Visualization]
+**Learning:** For financial breakdowns involving both income and expenses, sorting by raw value can hide high-impact transactions at both ends of the spectrum. Sorting by absolute magnitude ensures that the most significant financial activities—regardless of whether they are inflows or outflows—are prioritized for the user. Pairing this with semantic color coding (green/red) and explicit ARIA labels for the transaction type provides a balanced and accessible view of "importance".
+**Action:** Use `Math.abs` for sorting and percentage weighting in mixed-data breakdowns. Supplement with visual (color) and semantic (ARIA) cues to distinguish between positive and negative contributions.
