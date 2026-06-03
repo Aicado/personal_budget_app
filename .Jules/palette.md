@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Contrast and Component Hierarchy]
+**Learning:** Secondary text colors like #95a5a6 often fail WCAG AA contrast (3.1:1) on white backgrounds. Additionally, hardcoded heading levels in reusable components (like `CategoryBreakdown`) frequently break the document outline when the component is moved to different parent containers.
+**Action:** Use #65758a for secondary text to ensure at least 4.5:1 contrast. Refactor UI components to accept `title` and `titleLevel` props to maintain a semantic heading hierarchy regardless of where they are placed.

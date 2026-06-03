@@ -2,10 +2,18 @@ import './CategoryBreakdown.css'
 
 interface CategoryBreakdownProps {
   categoryTotals: Record<string, number>
+  title?: string
+  titleLevel?: 'h2' | 'h3' | 'h4'
 }
 
-export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
+export function CategoryBreakdown({
+  categoryTotals,
+  title = 'Top Spending Categories',
+  titleLevel = 'h3',
+}: CategoryBreakdownProps) {
   if (!categoryTotals || Object.keys(categoryTotals).length === 0) return null
+
+  const TitleTag = titleLevel
 
   // Sort by amount descending
   const sortedCategories = Object.entries(categoryTotals)
@@ -17,7 +25,7 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
 
   return (
     <div className="category-breakdown">
-      <h3>Top Spending Categories</h3>
+      <TitleTag>{title}</TitleTag>
       <div className="categories-list">
         {sortedCategories.map(([category, amount]) => {
           const percentage = (amount / total) * 100
