@@ -330,13 +330,11 @@ class TransactionDatabase:
 
         # Vectorized mapping from payee_mappings table to avoid row-by-row SQL queries
         # Use GROUP BY to ensure unique payees for the join, taking the most recent mapping
-        mappings_df = pl.from_arrow(
-            self.conn.execute("""
+        mappings_df = pl.from_arrow(self.conn.execute("""
                 SELECT payee, category, category_group
                 FROM payee_mappings
                 QUALIFY ROW_NUMBER() OVER(PARTITION BY payee ORDER BY created_at DESC) = 1
-            """).fetch_arrow_table()
-        )
+            """).fetch_arrow_table())
 
         if not mappings_df.is_empty():
             # Only map for Uncategorized transactions
@@ -528,11 +526,9 @@ class TransactionDatabase:
 
     def get_all_transactions(self) -> pl.DataFrame:
         """Retrieve all transactions from database."""
-        return pl.from_arrow(
-            self.conn.execute("""
+        return pl.from_arrow(self.conn.execute("""
                 SELECT * FROM transactions ORDER BY date DESC
-            """).fetch_arrow_table()
-        )
+            """).fetch_arrow_table())
 
     def get_category_summary(self) -> Dict[str, float]:
         """Get total amount by category."""

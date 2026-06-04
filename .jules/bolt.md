@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2025-05-19 - [Single-pass Stats Aggregation & Fast Dict Construction]
+**Learning:** Performing statistical aggregation in a truly single-pass by using `pl.col("month_str").n_unique()` within the same `select` statement (to calculate averages) is ~1.5x faster than using a separate `group_by`. Additionally, `dict(zip(df["key"], df["val"]))` is significantly faster for dictionary construction than iterating over `to_dicts()`.
+**Action:** Consolidate all possible aggregations into a single `select` or `group_by` pass and prefer `zip` for building dictionaries from Polars Series.

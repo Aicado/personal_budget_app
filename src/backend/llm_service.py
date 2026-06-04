@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
+
 class LLMCategorizer:
     """Service to categorize transactions using a local Ollama instance."""
 
@@ -19,7 +20,7 @@ class LLMCategorizer:
         amount: float,
         date: str,
         existing_categories: List[str],
-        client: Optional[httpx.AsyncClient] = None
+        client: Optional[httpx.AsyncClient] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Send a transaction to Ollama for categorization.
@@ -40,17 +41,14 @@ class LLMCategorizer:
 
         return None
 
-    async def _do_categorize(self, client: httpx.AsyncClient, prompt: str) -> Optional[Dict[str, Any]]:
+    async def _do_categorize(
+        self, client: httpx.AsyncClient, prompt: str
+    ) -> Optional[Dict[str, Any]]:
         """Helper to perform the actual HTTP call."""
         try:
             response = await client.post(
                 self.api_url,
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "format": "json"
-                }
+                json={"model": self.model, "prompt": prompt, "stream": False, "format": "json"},
             )
 
             if response.status_code != 200:
@@ -67,7 +65,7 @@ class LLMCategorizer:
                     return {
                         "category": category_data["category"],
                         "category_group": category_data["category_group"],
-                        "confidence": category_data.get("confidence", 0.5)
+                        "confidence": category_data.get("confidence", 0.5),
                     }
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse LLM response as JSON: {response_text}")
@@ -76,7 +74,9 @@ class LLMCategorizer:
 
         return None
 
-    def _build_prompt(self, payee: str, amount: float, date: str, existing_categories: List[str]) -> str:
+    def _build_prompt(
+        self, payee: str, amount: float, date: str, existing_categories: List[str]
+    ) -> str:
         categories_str = ", ".join(existing_categories)
         return f"""
         Analyze this financial transaction and categorize it.
