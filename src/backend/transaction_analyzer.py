@@ -214,7 +214,8 @@ class TransactionAnalyzer:
             .sort("category")
         )
 
-        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
+        # Using dict(zip(...)) is significantly faster than a Python-level loop over .to_dicts()
+        return dict(zip(totals["category"], totals["outflow"].cast(pl.Float64)))
 
     def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get summary statistics using a single-pass vectorized aggregation for performance."""
@@ -225,6 +226,7 @@ class TransactionAnalyzer:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
         # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        # Using .row(0, named=True) is slightly more efficient than .to_dicts()[0]
         stats = df.select(
             [
                 pl.col("inflow").sum().alias("total_inflow"),
@@ -233,7 +235,7 @@ class TransactionAnalyzer:
                 pl.col("date").min().alias("min_date"),
                 pl.col("date").max().alias("max_date"),
             ]
-        ).to_dicts()[0]
+        ).row(0, named=True)
 
         total_inflow = float(stats["total_inflow"] or 0.0)
         total_outflow = float(stats["total_outflow"] or 0.0)

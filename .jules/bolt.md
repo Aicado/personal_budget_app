@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2025-05-19 - [Vectorized Dictionary Construction in Polars]
+**Learning:** Constructing Python dictionaries from Polars DataFrames using `to_dicts()` is surprisingly slow because it materializes a dictionary for every row. Replacing this with `dict(zip(df['key'], df['val']))` or `.row(0, named=True)` for single rows provides a measurable speedup in API response generation.
+**Action:** Avoid `.to_dicts()` in performance-critical paths; use `dict(zip(...))` for multi-row mappings and `.row(0, named=True)` for single-row stats.
