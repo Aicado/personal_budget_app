@@ -1,28 +1,38 @@
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CategoryBreakdown } from '../CategoryBreakdown'
-import { describe, it, expect } from 'vitest'
 
 describe('CategoryBreakdown Accessibility', () => {
   const mockTotals = {
-    'Food': 500.00,
-    'Rent': 1500.00,
+    'Food': 542.50,
+    'Rent': 1200.00
   }
 
-  it('has correct ARIA attributes for progress bars', () => {
+  it('has accessible meter roles and labels', () => {
     render(<CategoryBreakdown categoryTotals={mockTotals} />)
 
-    const foodBar = screen.getByLabelText(/Food spending: \$500.00/)
-    expect(foodBar).toBeInTheDocument()
-    expect(foodBar).toHaveAttribute('role', 'meter')
-    expect(foodBar).toHaveAttribute('aria-valuenow', '500')
-    expect(foodBar).toHaveAttribute('aria-valuemin', '0')
-    expect(foodBar).toHaveAttribute('aria-valuemax', '1500')
+    const meters = screen.getAllByRole('meter')
+    expect(meters).toHaveLength(2)
 
-    const rentBar = screen.getByLabelText(/Rent spending: \$1500.00/)
-    expect(rentBar).toBeInTheDocument()
-    expect(rentBar).toHaveAttribute('role', 'meter')
-    expect(rentBar).toHaveAttribute('aria-valuenow', '1500')
-    expect(rentBar).toHaveAttribute('aria-valuemin', '0')
-    expect(rentBar).toHaveAttribute('aria-valuemax', '1500')
+    // Total is 1742.50. Rent (1200) is ~68.9%
+    const rentMeter = screen.getByLabelText(/Rent: \$1200.00 \(68.9% of total\)/)
+    expect(rentMeter).toBeInTheDocument()
+    expect(rentMeter).toHaveAttribute('aria-valuenow', '1200')
+    expect(rentMeter).toHaveAttribute('aria-valuemax', '1200') // Rent is max in this set
+  })
+
+  it('uses semantic list tags', () => {
+    render(<CategoryBreakdown categoryTotals={mockTotals} />)
+
+    expect(screen.getByRole('list')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+
+    const list = screen.getByRole('list')
+    expect(list.tagName).toBe('UL')
+  })
+
+  it('provides feedback when no data exists', () => {
+    render(<CategoryBreakdown categoryTotals={{ 'Nothing': 0 }} />)
+    expect(screen.getByText(/No spending data available/i)).toBeInTheDocument()
   })
 })

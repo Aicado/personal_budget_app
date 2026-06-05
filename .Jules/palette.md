@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Semantic Lists and Robust Data Magnitude Visualization]
+**Learning:** Using `role="list"` on generic `div`s is a secondary fallback; native `<ul>` and `<li>` elements are inherently semantic and better supported. In financial dashboards where "spending" might be represented as negative (outflow) or positive (magnitude), visualizations should use absolute values (`Math.abs`) for sorting and bar widths while remaining robust to the input data convention to avoid empty states or incorrect rankings.
+**Action:** Prefer semantic HTML elements over ARIA roles whenever possible. Use absolute magnitudes for sorting and scaling in "top breakdown" charts while remaining agnostic to the sign of the input data to ensure consistency across different ledger formats.
