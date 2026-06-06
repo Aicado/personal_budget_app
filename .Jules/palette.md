@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Heading Hierarchy and Semantic Lists]
+**Learning:** Hardcoding heading levels (e.g., `<h3>`) in reusable components often causes document hierarchy violations when those components are nested within different page structures (e.g., under another `<h3>`). Additionally, using generic `<div>` tags for data lists deprives screen reader users of the context that they are navigating a list of items.
+**Action:** Refactor UI components to accept a `titleLevel` prop, allowing them to adapt their heading level to their parent context. Always use semantic `<ul>` and `<li>` elements for data lists, ensuring that default browser list styles are reset in the CSS to maintain the intended visual design.

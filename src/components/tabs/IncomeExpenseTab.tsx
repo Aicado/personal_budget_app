@@ -85,7 +85,7 @@ export const IncomeExpenseTab: React.FC = () => {
 
           <div className="category-breakdown-container">
             <h3>By Category</h3>
-            <CategoryBreakdown categoryTotals={categoryData} />
+            <CategoryBreakdown categoryTotals={categoryData} titleLevel="h4" />
           </div>
         </>
       )}
