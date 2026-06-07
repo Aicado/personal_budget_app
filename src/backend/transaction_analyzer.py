@@ -10,17 +10,18 @@ class TransactionAnalyzer:
     def __init__(self):
         self.df: pl.DataFrame | None = None
 
-    def _clean_amount_column(self, df: pl.DataFrame, column: str) -> pl.DataFrame:
-        if column not in df.columns:
-            return df.with_columns(pl.lit(0.0).alias(column))
+    def _clean_amount_column(self, column: str, schema: pl.Schema) -> pl.Expr:
+        """Returns a Polars expression to clean and cast an amount column."""
+        if column not in schema:
+            return pl.lit(0.0).alias(column)
 
         # If already numeric, just fill nulls and return to avoid expensive string operations
-        if df.schema[column].is_numeric():
-            return df.with_columns(pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column))
+        if schema[column].is_numeric():
+            return pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column)
 
         # Use literal=True to avoid regex overhead and correctly handle $
         # Use strict=False with fill_null for a single-pass vectorized cleaning
-        return df.with_columns(
+        return (
             pl.col(column)
             .cast(pl.Utf8)
             .str.replace_all("$", "", literal=True)
@@ -40,95 +41,78 @@ class TransactionAnalyzer:
         return pl.read_csv(file_path, try_parse_dates=True)
 
     def parse_transactions(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Parse and clean transaction data from DataFrame."""
-        df = df.clone()
-
+        """Parse and clean transaction data from DataFrame using vectorized operations."""
         # Standardize column names
         df.columns = [col.strip().lower() for col in df.columns]
+        schema = df.schema
 
-        # Parse date column - handle multiple date column names
-        date_col = None
-        for potential_date in ["date", "transaction date", "posted date"]:
-            if potential_date in df.columns:
-                date_col = potential_date
-                break
+        # Pass 1: Handle Date and base Inflow/Outflow columns
+        pass1_exprs = []
 
+        # Find date column
+        date_col = next(
+            (c for c in ["date", "transaction date", "posted date"] if c in df.columns), None
+        )
         if date_col:
-            # If already a date or datetime, just alias it to avoid expensive string re-parsing
-            if df.schema[date_col] in [pl.Date, pl.Datetime]:
-                df = df.with_columns(pl.col(date_col).cast(pl.Date).alias("date"))
+            if schema[date_col] in [pl.Date, pl.Datetime]:
+                pass1_exprs.append(pl.col(date_col).cast(pl.Date).alias("date"))
             else:
-                df = df.with_columns(
+                pass1_exprs.append(
                     pl.col(date_col).cast(pl.Utf8).str.strptime(pl.Date, strict=False).alias("date")
                 )
         else:
             raise ValueError(f"CSV must contain a date column. Available columns: {df.columns}")
 
-        # Handle outflow/inflow vs debit/credit formats
+        # Handle amount formats
         if "outflow" in df.columns and "inflow" in df.columns:
-            df = self._clean_amount_column(df, "outflow")
-            df = self._clean_amount_column(df, "inflow")
+            pass1_exprs.extend(
+                [
+                    self._clean_amount_column("outflow", schema),
+                    self._clean_amount_column("inflow", schema),
+                ]
+            )
         elif "debit" in df.columns and "credit" in df.columns:
-            df = self._clean_amount_column(df, "debit")
-            df = self._clean_amount_column(df, "credit")
-            df = df.with_columns(
-                pl.col("debit").alias("outflow"),
-                pl.col("credit").alias("inflow"),
+            pass1_exprs.extend(
+                [
+                    self._clean_amount_column("debit", schema).alias("outflow"),
+                    self._clean_amount_column("credit", schema).alias("inflow"),
+                ]
             )
         else:
-            df = df.with_columns(
-                pl.lit(0.0).alias("outflow"),
-                pl.lit(0.0).alias("inflow"),
-            )
+            pass1_exprs.extend([pl.lit(0.0).alias("outflow"), pl.lit(0.0).alias("inflow")])
 
-        df = df.with_columns((pl.col("inflow") - pl.col("outflow")).alias("amount"))
+        # Execute first pass
+        df = df.with_columns(pass1_exprs)
 
-        if "category group/category" in df.columns:
-            df = df.with_columns(
-                pl.col("category group/category")
-                .fill_null("Uncategorized")
-                .cast(pl.Utf8)
-                .alias("category")
-            )
-        elif "category" in df.columns:
-            df = df.with_columns(
-                pl.col("category").fill_null("Uncategorized").cast(pl.Utf8).alias("category")
-            )
-        else:
-            df = df.with_columns(
-                pl.lit("Uncategorized").alias("category"),
-                pl.lit("Uncategorized").alias("category_group"),
-            )
-
-        if "category" in df.columns and "category_group" not in df.columns:
-            df = df.with_columns(
-                pl.col("category")
-                .str.split("|")
-                .list.get(0)
-                .str.strip_chars()
-                .alias("category_group"),
-                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-            )
-        elif "category group/category" in df.columns:
-            df = df.with_columns(
-                pl.col("category")
-                .str.split("|")
-                .list.get(0)
-                .str.strip_chars()
-                .alias("category_group"),
-                pl.col("category").str.split("|").list.get(-1).str.strip_chars().alias("category"),
-            )
-
-        df = df.with_columns(
+        # Pass 2: Derived columns (amount, category, types, month_str)
+        pass2_exprs = [
+            (pl.col("inflow") - pl.col("outflow")).alias("amount"),
+            pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
             pl.when(pl.col("inflow") > pl.col("outflow"))
             .then(pl.lit("income"))
             .when(pl.col("outflow") > pl.col("inflow"))
             .then(pl.lit("expense"))
             .otherwise(pl.lit("transfer"))
             .alias("transaction_type"),
-            pl.col("date").dt.strftime("%Y-%m").alias("month_str"),
-        )
+        ]
 
+        # Unified Category logic
+        cat_col = "category group/category" if "category group/category" in df.columns else "category"
+        if cat_col in df.columns:
+            cat_expr = pl.col(cat_col).fill_null("Uncategorized").cast(pl.Utf8)
+            # If it's a combined column or we need to split it
+            pass2_exprs.extend(
+                [
+                    cat_expr.str.split("|").list.get(0).str.strip_chars().alias("category_group"),
+                    cat_expr.str.split("|").list.get(-1).str.strip_chars().alias("category"),
+                ]
+            )
+        else:
+            pass2_exprs.extend(
+                [pl.lit("Uncategorized").alias("category"), pl.lit("Uncategorized").alias("category_group")]
+            )
+
+        df = df.with_columns(pass2_exprs)
         self.df = df
         return df
 
@@ -214,7 +198,10 @@ class TransactionAnalyzer:
             .sort("category")
         )
 
-        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
+        # Optimization: constructing dictionaries from Polars columns using dict(zip(...))
+        # is significantly faster than list comprehensions over .to_dicts() for result
+        # sets with many unique keys.
+        return dict(zip(totals["category"], totals["outflow"]))
 
     def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get summary statistics using a single-pass vectorized aggregation for performance."""
