@@ -2,9 +2,15 @@ import './CategoryBreakdown.css'
 
 interface CategoryBreakdownProps {
   categoryTotals: Record<string, number>
+  title?: string
+  titleLevel?: 'h2' | 'h3' | 'h4'
 }
 
-export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
+export function CategoryBreakdown({
+  categoryTotals,
+  title = 'Top Spending Categories',
+  titleLevel = 'h3',
+}: CategoryBreakdownProps) {
   if (!categoryTotals || Object.keys(categoryTotals).length === 0) return null
 
   // Sort by amount descending
@@ -15,14 +21,16 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
   const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0)
   const maxAmount = Math.max(...Object.values(categoryTotals))
 
+  const TitleTag = titleLevel
+
   return (
     <div className="category-breakdown">
-      <h3>Top Spending Categories</h3>
-      <div className="categories-list">
+      <TitleTag>{title}</TitleTag>
+      <ul className="breakdown-list">
         {sortedCategories.map(([category, amount]) => {
           const percentage = (amount / total) * 100
           return (
-            <div key={category} className="category-item">
+            <li key={category} className="breakdown-item">
               <div className="category-header">
                 <span className="category-name">{category}</span>
                 <span className="category-amount">${amount.toFixed(2)}</span>
@@ -34,17 +42,17 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
                   aria-valuenow={amount}
                   aria-valuemin={0}
                   aria-valuemax={maxAmount}
-                  aria-label={`${category} spending: $${amount.toFixed(2)}`}
+                  aria-label={`${category} spending: $${amount.toFixed(2)} (${percentage.toFixed(1)}%)`}
                   style={{
                     width: `${(amount / maxAmount) * 100}%`,
                   }}
                 />
               </div>
               <div className="category-percentage">{percentage.toFixed(1)}% of total</div>
-            </div>
+            </li>
           )
         })}
-      </div>
+      </ul>
       <div className="category-footer">
         <div className="total-spending">
           <span>Total Spending:</span>
