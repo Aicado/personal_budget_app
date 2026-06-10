@@ -152,11 +152,13 @@ class TransactionAnalyzer:
             .sort("month_str")
         )
 
+        # Use to_dict(as_series=False) for more efficient vectorized extraction of multiple columns.
+        data = monthly.to_dict(as_series=False)
         return {
-            "months": monthly["month_str"].to_list(),
-            "net_amounts": monthly["amount"].to_list(),
-            "outflows": monthly["outflow"].to_list(),
-            "inflows": monthly["inflow"].to_list(),
+            "months": data["month_str"],
+            "net_amounts": data["amount"],
+            "outflows": data["outflow"],
+            "inflows": data["inflow"],
         }
 
     def get_category_trends(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
@@ -214,7 +216,9 @@ class TransactionAnalyzer:
             .sort("category")
         )
 
-        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
+        # Optimized dictionary construction: dict(zip()) is significantly faster than
+        # list comprehension over to_dicts() for large result sets.
+        return dict(zip(totals["category"], totals["outflow"]))
 
     def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get summary statistics using a single-pass vectorized aggregation for performance."""
@@ -224,12 +228,14 @@ class TransactionAnalyzer:
         if df is None:
             raise ValueError("No data loaded. Call parse_transactions first.")
 
-        # Single-pass aggregation for most stats to avoid scanning the same columns multiple times
+        # Single-pass aggregation for all stats to avoid redundant scans and expensive group_by operations.
+        # Including unique count of months allows calculating monthly averages directly from totals.
         stats = df.select(
             [
                 pl.col("inflow").sum().alias("total_inflow"),
                 pl.col("outflow").sum().alias("total_outflow"),
                 pl.col("category").n_unique().alias("unique_categories"),
+                pl.col("month_str").n_unique().alias("unique_months"),
                 pl.col("date").min().alias("min_date"),
                 pl.col("date").max().alias("max_date"),
             ]
@@ -237,16 +243,10 @@ class TransactionAnalyzer:
 
         total_inflow = float(stats["total_inflow"] or 0.0)
         total_outflow = float(stats["total_outflow"] or 0.0)
+        num_months = stats["unique_months"] or 1
 
-        monthly = df.group_by("month_str").agg(
-            [
-                pl.col("inflow").sum().alias("monthly_inflow"),
-                pl.col("outflow").sum().alias("monthly_outflow"),
-            ]
-        )
-
-        avg_monthly_inflow = float(monthly["monthly_inflow"].mean() or 0.0)
-        avg_monthly_outflow = float(monthly["monthly_outflow"].mean() or 0.0)
+        avg_monthly_inflow = total_inflow / num_months
+        avg_monthly_outflow = total_outflow / num_months
 
         return {
             "total_inflow": round(total_inflow, 2),
