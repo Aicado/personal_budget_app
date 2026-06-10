@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { CategoryBreakdown } from '../CategoryBreakdown'
 import { describe, it, expect } from 'vitest'
 
@@ -24,5 +24,28 @@ describe('CategoryBreakdown Accessibility', () => {
     expect(rentBar).toHaveAttribute('aria-valuenow', '1500')
     expect(rentBar).toHaveAttribute('aria-valuemin', '0')
     expect(rentBar).toHaveAttribute('aria-valuemax', '1500')
+  })
+
+  it('uses semantic list for categories', () => {
+    render(<CategoryBreakdown categoryTotals={mockTotals} />)
+
+    const list = screen.getByRole('list')
+    expect(list).toHaveClass('categories-list')
+
+    const items = within(list).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+  })
+
+  it('renders with custom title and heading level', () => {
+    render(
+      <CategoryBreakdown
+        categoryTotals={mockTotals}
+        title="Spending Stats"
+        titleLevel="h2"
+      />
+    )
+
+    const heading = screen.getByRole('heading', { level: 2 })
+    expect(heading).toHaveTextContent('Spending Stats')
   })
 })
