@@ -10,17 +10,18 @@ class TransactionAnalyzer:
     def __init__(self):
         self.df: pl.DataFrame | None = None
 
-    def _clean_amount_column(self, df: pl.DataFrame, column: str) -> pl.DataFrame:
+    def _get_amount_clean_expr(self, df: pl.DataFrame, column: str) -> pl.Expr:
+        """Helper to return a cleaning expression for amount columns."""
         if column not in df.columns:
-            return df.with_columns(pl.lit(0.0).alias(column))
+            return pl.lit(0.0).alias(column)
 
-        # If already numeric, just fill nulls and return to avoid expensive string operations
+        # If already numeric, just fill nulls to avoid expensive string operations
         if df.schema[column].is_numeric():
-            return df.with_columns(pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column))
+            return pl.col(column).fill_null(0.0).cast(pl.Float64).alias(column)
 
         # Use literal=True to avoid regex overhead and correctly handle $
         # Use strict=False with fill_null for a single-pass vectorized cleaning
-        return df.with_columns(
+        return (
             pl.col(column)
             .cast(pl.Utf8)
             .str.replace_all("$", "", literal=True)
@@ -64,21 +65,33 @@ class TransactionAnalyzer:
         else:
             raise ValueError(f"CSV must contain a date column. Available columns: {df.columns}")
 
-        # Handle outflow/inflow vs debit/credit formats
+        # Handle outflow/inflow vs debit/credit formats using batched transformations
+        # This avoids multiple DataFrame clones and scans.
         if "outflow" in df.columns and "inflow" in df.columns:
-            df = self._clean_amount_column(df, "outflow")
-            df = self._clean_amount_column(df, "inflow")
-        elif "debit" in df.columns and "credit" in df.columns:
-            df = self._clean_amount_column(df, "debit")
-            df = self._clean_amount_column(df, "credit")
             df = df.with_columns(
-                pl.col("debit").alias("outflow"),
-                pl.col("credit").alias("inflow"),
+                [
+                    self._get_amount_clean_expr(df, "outflow"),
+                    self._get_amount_clean_expr(df, "inflow"),
+                ]
+            )
+        elif "debit" in df.columns and "credit" in df.columns:
+            df = df.with_columns(
+                [
+                    self._get_amount_clean_expr(df, "debit"),
+                    self._get_amount_clean_expr(df, "credit"),
+                ]
+            ).with_columns(
+                [
+                    pl.col("debit").alias("outflow"),
+                    pl.col("credit").alias("inflow"),
+                ]
             )
         else:
             df = df.with_columns(
-                pl.lit(0.0).alias("outflow"),
-                pl.lit(0.0).alias("inflow"),
+                [
+                    pl.lit(0.0).alias("outflow"),
+                    pl.lit(0.0).alias("inflow"),
+                ]
             )
 
         df = df.with_columns((pl.col("inflow") - pl.col("outflow")).alias("amount"))
@@ -190,9 +203,11 @@ class TransactionAnalyzer:
         # are present in the output, even if they have no transactions in the given period.
         data = pivot.select(
             [
-                pl.col(cat).round(2)
-                if cat in pivot.columns
-                else pl.repeat(0.0, pivot.height).alias(cat)
+                (
+                    pl.col(cat).round(2)
+                    if cat in pivot.columns
+                    else pl.repeat(0.0, pivot.height).alias(cat)
+                )
                 for cat in categories
             ]
         ).to_dict(as_series=False)
@@ -214,7 +229,9 @@ class TransactionAnalyzer:
             .sort("category")
         )
 
-        return {row["category"]: float(row["outflow"]) for row in totals.to_dicts()}
+        # Optimization: Use dict(zip(...)) for significantly faster dictionary construction
+        # than iterating over to_dicts() for large result sets.
+        return dict(zip(totals["category"], totals["outflow"]))
 
     def get_summary_stats(self, df: pl.DataFrame | None = None) -> Dict[str, Any]:
         """Get summary statistics using a single-pass vectorized aggregation for performance."""

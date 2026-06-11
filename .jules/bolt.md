@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2026-06-11 - [Expression Batching vs Multiple with_columns]
+**Learning:** Refactoring Polars cleaning helpers to return `pl.Expr` instead of `pl.DataFrame` allows batching transformations into a single `with_columns` call. This avoids multiple intermediate DataFrame clones and schema materializations, which resulted in a ~1.86x speedup (0.68s to 0.37s) for `parse_transactions` on 1M rows.
+**Action:** Always prefer returning expressions from transformation helpers to enable vectorized batching in the main processing pipeline.
