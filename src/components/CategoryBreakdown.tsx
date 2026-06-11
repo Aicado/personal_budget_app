@@ -2,22 +2,35 @@ import './CategoryBreakdown.css'
 
 interface CategoryBreakdownProps {
   categoryTotals: Record<string, number>
+  title?: string
+  titleLevel?: 'h2' | 'h3' | 'h4'
 }
 
-export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
+export function CategoryBreakdown({
+  categoryTotals,
+  title = 'Top Spending Categories',
+  titleLevel = 'h3',
+}: CategoryBreakdownProps) {
   if (!categoryTotals || Object.keys(categoryTotals).length === 0) return null
 
-  // Sort by amount descending
-  const sortedCategories = Object.entries(categoryTotals)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 10) // Top 10 categories
+  // Filter for expenses (negative values) and use absolute amounts
+  const expenses = Object.entries(categoryTotals)
+    .filter(([, amount]) => amount < 0)
+    .map(([category, amount]) => [category, Math.abs(amount)] as [string, number])
 
-  const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0)
-  const maxAmount = Math.max(...Object.values(categoryTotals))
+  if (expenses.length === 0) return null
+
+  // Sort by amount descending
+  const sortedCategories = expenses.sort(([, a], [, b]) => b - a).slice(0, 10) // Top 10 categories
+
+  const total = expenses.reduce((sum, [, val]) => sum + val, 0)
+  const maxAmount = Math.max(...expenses.map(([, val]) => val))
+
+  const TitleTag = titleLevel
 
   return (
     <div className="category-breakdown">
-      <h3>Top Spending Categories</h3>
+      <TitleTag>{title}</TitleTag>
       <div className="categories-list">
         {sortedCategories.map(([category, amount]) => {
           const percentage = (amount / total) * 100
@@ -40,7 +53,7 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
                   }}
                 />
               </div>
-              <div className="category-percentage">{percentage.toFixed(1)}% of total</div>
+              <div className="category-percentage">{percentage.toFixed(1)}% of total spending</div>
             </div>
           )
         })}
@@ -51,7 +64,7 @@ export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
           <span className="total-amount">${total.toFixed(2)}</span>
         </div>
         <div className="category-count">
-          Showing top {sortedCategories.length} of {Object.keys(categoryTotals).length} categories
+          Showing top {sortedCategories.length} of {expenses.length} spending categories
         </div>
       </div>
     </div>

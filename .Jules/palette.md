@@ -25,3 +25,7 @@
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
+
+## 2025-05-25 - [Spending Breakdown Logic and Semantic Hierarchy]
+**Learning:** Components labeled as "Spending Breakdown" that display mixed income/expense data without filtering are confusing and mathematically misleading. Explicitly filtering for negative values and using absolute magnitudes ensures the visualization aligns with the user's intent to "see where money went." Furthermore, providing a `titleLevel` prop allows components to maintain a valid heading hierarchy across different parent containers.
+**Action:** Always filter data for the specific context (e.g., expenses for spending charts) and provide flexible heading levels to ensure semantic correctness in varying DOM locations.
