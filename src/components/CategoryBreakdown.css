@@ -2,18 +2,22 @@
   margin: 2rem 0;
 }
 
-.category-breakdown h2 {
+.category-breakdown h2,
+.category-breakdown h3,
+.category-breakdown h4 {
   color: #2c3e50;
   margin-bottom: 1.5rem;
   border-bottom: 2px solid #9b59b6;
   padding-bottom: 0.5rem;
 }
 
-.categories-list {
+.breakdown-list {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   border: 1px solid #ecf0f1;
+  list-style: none;
+  margin: 0;
 }
 
 .category-item {
@@ -66,7 +70,7 @@
 
 .category-percentage {
   font-size: 0.85rem;
-  color: #95a5a6;
+  color: #65758a;
   text-align: right;
 }
 

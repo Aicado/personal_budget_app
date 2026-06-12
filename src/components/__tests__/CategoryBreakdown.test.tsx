@@ -4,9 +4,10 @@ import { describe, it, expect } from 'vitest'
 
 describe('CategoryBreakdown', () => {
   const mockTotals = {
-    'Food': 500.00,
-    'Rent': 1500.00,
-    'Utilities': 200.00
+    Food: -500.0,
+    Rent: -1500.0,
+    Utilities: -200.0,
+    Income: 1000.0, // Should be filtered out
   }
 
   it('renders category totals correctly', () => {
@@ -19,6 +20,14 @@ describe('CategoryBreakdown', () => {
     expect(screen.getByText('$1500.00')).toBeInTheDocument()
     expect(screen.getByText('Total Spending:')).toBeInTheDocument()
     expect(screen.getByText('$2200.00')).toBeInTheDocument()
+    // Income should be filtered out
+    expect(screen.queryByText('Income')).not.toBeInTheDocument()
+  })
+
+  it('renders with custom title and level', () => {
+    render(<CategoryBreakdown categoryTotals={mockTotals} title="Custom Title" titleLevel="h2" />)
+    expect(screen.getByText('Custom Title')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument()
   })
 
   it('returns null when no categories provided', () => {
