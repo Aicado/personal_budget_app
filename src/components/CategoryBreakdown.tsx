@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import './CategoryBreakdown.css'
 
 interface CategoryBreakdownProps {
@@ -5,53 +6,64 @@ interface CategoryBreakdownProps {
 }
 
 export function CategoryBreakdown({ categoryTotals }: CategoryBreakdownProps) {
+  const titleId = useId()
+
   if (!categoryTotals || Object.keys(categoryTotals).length === 0) return null
 
-  // Sort by amount descending
-  const sortedCategories = Object.entries(categoryTotals)
+  // Filter for expenses (negative values) and use absolute amounts
+  const expenses = Object.entries(categoryTotals)
+    .filter(([, amount]) => amount < 0)
+    .map(([category, amount]) => [category, Math.abs(amount)] as [string, number])
+
+  if (expenses.length === 0) return null
+
+  // Sort by absolute amount descending
+  const sortedCategories = expenses
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10) // Top 10 categories
 
-  const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0)
-  const maxAmount = Math.max(...Object.values(categoryTotals))
+  const totalSpending = expenses.reduce((sum, [, amount]) => sum + amount, 0)
+  const maxAmount = Math.max(...expenses.map(([, amount]) => amount))
 
   return (
-    <div className="category-breakdown">
-      <h3>Top Spending Categories</h3>
-      <div className="categories-list">
+    <div className="category-breakdown" role="region" aria-labelledby={titleId}>
+      <h3 id={titleId}>Top Spending Categories</h3>
+      <ul className="breakdown-list">
         {sortedCategories.map(([category, amount]) => {
-          const percentage = (amount / total) * 100
+          const percentage = (amount / totalSpending) * 100
+          const formattedAmount = `$${amount.toFixed(2)}`
           return (
-            <div key={category} className="category-item">
-              <div className="category-header">
-                <span className="category-name">{category}</span>
-                <span className="category-amount">${amount.toFixed(2)}</span>
+            <li key={category} className="breakdown-item">
+              <div className="breakdown-header">
+                <span className="breakdown-name">{category}</span>
+                <span className="breakdown-amount">{formattedAmount}</span>
               </div>
-              <div className="category-bar-container">
+              <div className="breakdown-bar-container">
                 <div
-                  className="category-bar"
+                  className="breakdown-bar"
                   role="meter"
                   aria-valuenow={amount}
                   aria-valuemin={0}
                   aria-valuemax={maxAmount}
-                  aria-label={`${category} spending: $${amount.toFixed(2)}`}
+                  aria-valuetext={formattedAmount}
+                  aria-label={`${category} spending`}
                   style={{
                     width: `${(amount / maxAmount) * 100}%`,
                   }}
                 />
               </div>
-              <div className="category-percentage">{percentage.toFixed(1)}% of total</div>
-            </div>
+              <div className="breakdown-percentage">{percentage.toFixed(1)}% of total</div>
+            </li>
           )
         })}
-      </div>
-      <div className="category-footer">
+      </ul>
+      <div className="breakdown-footer">
         <div className="total-spending">
           <span>Total Spending:</span>
-          <span className="total-amount">${total.toFixed(2)}</span>
+          <span className="total-amount">${totalSpending.toFixed(2)}</span>
         </div>
-        <div className="category-count">
-          Showing top {sortedCategories.length} of {Object.keys(categoryTotals).length} categories
+        <div className="breakdown-count">
+          Showing top {sortedCategories.length} of {expenses.length} categories
         </div>
       </div>
     </div>

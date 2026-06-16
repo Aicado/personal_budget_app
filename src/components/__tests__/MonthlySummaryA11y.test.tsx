@@ -14,31 +14,35 @@ describe('MonthlySummary Accessibility', () => {
     render(<MonthlySummary {...mockProps} />)
 
     // Check 2024-01 income bar
-    const incomeBar1 = screen.getByLabelText(/2024-01 income: \$5000.00/)
+    const incomeBar1 = screen.getByLabelText(/2024-01 income/)
     expect(incomeBar1).toBeInTheDocument()
     expect(incomeBar1).toHaveAttribute('role', 'meter')
     expect(incomeBar1).toHaveAttribute('aria-valuenow', '5000')
     expect(incomeBar1).toHaveAttribute('aria-valuemin', '0')
     expect(incomeBar1).toHaveAttribute('aria-valuemax', '6000')
+    expect(incomeBar1).toHaveAttribute('aria-valuetext', '$5000.00')
 
     // Check 2024-01 expense bar
-    const expenseBar1 = screen.getByLabelText(/2024-01 expenses: \$3000.00/)
+    const expenseBar1 = screen.getByLabelText(/2024-01 expenses/)
     expect(expenseBar1).toBeInTheDocument()
     expect(expenseBar1).toHaveAttribute('role', 'meter')
     expect(expenseBar1).toHaveAttribute('aria-valuenow', '3000')
     expect(expenseBar1).toHaveAttribute('aria-valuemin', '0')
     expect(expenseBar1).toHaveAttribute('aria-valuemax', '4000')
+    expect(expenseBar1).toHaveAttribute('aria-valuetext', '$3000.00')
 
     // Check 2024-02 income bar
-    const incomeBar2 = screen.getByLabelText(/2024-02 income: \$6000.00/)
+    const incomeBar2 = screen.getByLabelText(/2024-02 income/)
     expect(incomeBar2).toBeInTheDocument()
     expect(incomeBar2).toHaveAttribute('aria-valuenow', '6000')
     expect(incomeBar2).toHaveAttribute('aria-valuemax', '6000')
+    expect(incomeBar2).toHaveAttribute('aria-valuetext', '$6000.00')
 
     // Check 2024-02 expense bar
-    const expenseBar2 = screen.getByLabelText(/2024-02 expenses: \$4000.00/)
+    const expenseBar2 = screen.getByLabelText(/2024-02 expenses/)
     expect(expenseBar2).toBeInTheDocument()
     expect(expenseBar2).toHaveAttribute('aria-valuenow', '4000')
     expect(expenseBar2).toHaveAttribute('aria-valuemax', '4000')
+    expect(expenseBar2).toHaveAttribute('aria-valuetext', '$4000.00')
   })
 })

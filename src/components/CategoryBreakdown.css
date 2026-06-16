@@ -9,33 +9,35 @@
   padding-bottom: 0.5rem;
 }
 
-.categories-list {
+.breakdown-list {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   border: 1px solid #ecf0f1;
+  list-style: none;
+  margin: 0;
 }
 
-.category-item {
+.breakdown-item {
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid #ecf0f1;
 }
 
-.category-item:last-child {
+.breakdown-item:last-child {
   margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: none;
 }
 
-.category-header {
+.breakdown-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
 }
 
-.category-name {
+.breakdown-name {
   font-weight: 600;
   color: #2c3e50;
   max-width: 70%;
@@ -44,13 +46,13 @@
   white-space: nowrap;
 }
 
-.category-amount {
+.breakdown-amount {
   font-weight: 700;
   color: #9b59b6;
   font-size: 1.05rem;
 }
 
-.category-bar-container {
+.breakdown-bar-container {
   background-color: #ecf0f1;
   border-radius: 4px;
   height: 20px;
@@ -58,19 +60,19 @@
   margin-bottom: 0.5rem;
 }
 
-.category-bar {
+.breakdown-bar {
   background: linear-gradient(90deg, #9b59b6, #8e44ad);
   height: 100%;
   transition: width 0.3s ease;
 }
 
-.category-percentage {
+.breakdown-percentage {
   font-size: 0.85rem;
-  color: #95a5a6;
+  color: #65758a;
   text-align: right;
 }
 
-.category-footer {
+.breakdown-footer {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
   border-top: 2px solid #ecf0f1;
@@ -94,7 +96,7 @@
   font-size: 1.3rem;
 }
 
-.category-count {
+.breakdown-count {
   font-size: 0.9rem;
   color: #65758a;
 }
