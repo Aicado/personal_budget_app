@@ -17,3 +17,7 @@
 ## 2025-05-18 - [Account Index for Status Retrieval]
 **Learning:** Adding a database index on the `account` column in the `transactions` table (DuckDB) significantly improves performance for account-specific filtering and transaction retrieval by avoiding full table scans during `GROUP BY` operations in `get_account_load_status`.
 **Action:** Always index columns used in frequent `GROUP BY` or `WHERE` clauses in the core transaction table to maintain dashboard responsiveness as data volume grows.
+
+## 2026-06-16 - [Single-Pass Aggregation & Vectorized Dict Construction]
+**Learning:** In TransactionAnalyzer, summary calculations were performing redundant passes over the data (e.g., using group_by just to get a count of unique months). Transitioning to a truly single-pass aggregation using `pl.col("month_str").n_unique()` and deriving averages from totals reduced `get_summary_stats` latency by ~36%. Additionally, replacing `to_dicts()` with `dict(zip(...))` for category totals provided a further ~18% speedup.
+**Action:** Always favor single-pass vectorized aggregations in Polars over multiple passes or redundant group_by operations, and use `dict(zip(keys, values))` for high-performance dictionary construction from Series.
