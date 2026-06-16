@@ -9,20 +9,22 @@
   padding-bottom: 0.5rem;
 }
 
-.categories-list {
+.breakdown-list {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   border: 1px solid #ecf0f1;
+  list-style: none;
+  margin: 0;
 }
 
-.category-item {
+.breakdown-item {
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid #ecf0f1;
 }
 
-.category-item:last-child {
+.breakdown-item:last-child {
   margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: none;
@@ -66,7 +68,7 @@
 
 .category-percentage {
   font-size: 0.85rem;
-  color: #95a5a6;
+  color: #65758a;
   text-align: right;
 }
 

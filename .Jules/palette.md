@@ -22,6 +22,10 @@
 **Learning:** Scrollable containers for data (like transaction tables) must be explicitly focusable via `tabIndex={0}` and labeled with `role="region"` and `aria-label` to be navigable by keyboard users. Additionally, asynchronous actions within lists (like expanding an item that requires a fetch) should provide per-item visual feedback (loading spinners) and disable the specific trigger to prevent redundant requests and clarify state.
 **Action:** Always wrap scrollable data regions with appropriate ARIA roles and labels. Ensure every async interaction has a corresponding loading state and disabled state on its trigger.
 
+## 2025-05-25 - [Semantic Breakdowns and Currency Meters]
+**Learning:** For data visualizations like `role="meter"` that represent currency, `aria-valuenow` alone is insufficient as screen readers may not announce the unit. Providing the formatted currency string via `aria-valuetext` ensures clarity. Additionally, using semantic `ul`/`li` tags for breakdown lists (with `list-style: none`) provides better document structure and item counting for screen reader users compared to generic `div` containers.
+**Action:** Always pair `role="meter"` with `aria-valuetext` when representing non-percentage values. Prefer semantic list elements for repeating data items in dashboards.
+
 ## 2025-05-24 - [Skip Link and Alert Accessibility]
 **Learning:** Keyboard users and screen reader users need a "Skip to main content" link to efficiently bypass repetitive navigation. Furthermore, dynamic error messages must have `role="alert"` to be immediately announced by screen readers. Heading hierarchy (h1 -> h2 -> h3) is crucial for screen reader users to navigate the page structure via the rotor.
 **Action:** Always include a visually-hidden (on focus, visible) skip link in dashboards. Ensure all error message containers use `role="alert"`. Audit heading levels in nested components to ensure they follow a logical sequence.
